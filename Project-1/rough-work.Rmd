@@ -1,0 +1,24 @@
+---
+title: "rough work - project 1"
+author: "Eliott Van Dieren"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(readr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+snow_particles <- read_csv("1_snow_particles.csv")
+head(snow_particles)
+```
+
+## Visualizing the data
+
+```{r echo=FALSE}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
