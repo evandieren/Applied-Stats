@@ -175,15 +175,16 @@ obj_func <- function(x, data) {
   return(-ecdf_diff) # maximize the absolute difference
 }
 
-B <- 15
+B <- 100
 data <- snow_particles[c("startpoint","endpoint","n_snow_bin")]
 T_list <- numeric(B)
+opt_result <- optimize(obj_func, interval =c(0,snow_particles$endpoint[n_bins]), data = list(X,theta_hat))
+T_ <- -opt_result$objective
 for (b in 1:B) {
   # 1) Resampling from jittering
   X_b <- sample(X,n_particules,replace = T)
   
   # 2) Recreating the binning dataset
-  
   counts <- count_bins(X_b,data)
   data$n_snow_bin = counts
   
@@ -192,9 +193,10 @@ for (b in 1:B) {
   print(b)
   # 4) Getting the best param estimators by optimizing the new neg_loglikelihood
   opt_X_b <- optim(init_val_X_b,neg_loglikelihood,data=data)
-  print(opt_X_b)
   # 5) Computing T*
-  opt_result <- optimize(obj_func, interval =c(0,snow_particles$endpoint[n_bins]), data = list(X,opt_X_b))
+  opt_result <- optimize(obj_func, interval =c(0,snow_particles$endpoint[n_bins]), data = list(X_b,opt_X_b))
   T_list[b] <- -opt_result$objective
+  print(-opt_result$objective)
 }
-T_list
+p_val = 1/(B+1)*(1+sum(T_<=T_list))
+p_val
