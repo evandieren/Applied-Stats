@@ -1,5 +1,4 @@
 library(readr)
-library(ggplot2)
 snow_particles <- read_csv("1_snow_particles.csv")
 n_bins <- length(snow_particles$startpoint)
 snow_particles$endpoint[n_bins] <- snow_particles$endpoint[n_bins-1]+0.25
@@ -7,16 +6,16 @@ snow_particles$endpoint[n_bins] <- snow_particles$endpoint[n_bins-1]+0.25
 breakpoints <- c(snow_particles$startpoint[1],snow_particles$endpoint)
 
 n_particules <- snow_particles$particles.detected[1] # 700k
-n_snow_bin <- round(0.01*snow_particles$particles.detected*snow_particles$retained....)
+snow_particles$n_snow_bin = round(0.01*snow_particles$particles.detected*snow_particles$retained....)
 
-width <- rep(0,length(n_snow_bin))
-for (i in 1:length(n_snow_bin)){
+width <- rep(0,n_bins)
+for (i in 1:n_bins){
   width[i] = snow_particles$endpoint[i]-snow_particles$startpoint[i]
 }
-bp <- barplot(height = n_snow_bin,
+bp <- barplot(height = snow_particles$n_snow_bin,
               width = width,
               xlim = c(breakpoints[1], breakpoints[length(breakpoints)]), 
-              ylim = c(0, max(n_snow_bin) * 1.1), 
+              ylim = c(0, max(snow_particles$n_snow_bin) * 1.1), 
               xlab = "Snowflakes diameter", 
               ylab = "Number of snowflakes",
               main = "Snowflake distribution",
@@ -29,12 +28,12 @@ axis(side=1, at =bp,label=snow_particles$startpoint,cex.axis = 0.75)
 set.seed(42)
 X = rep(0,n_particules)
 count <- 0
-for (i in 1:length(n_snow_bin)){
-  if (n_snow_bin[i] != 0){
+for (i in 1:n_bins){
+  if (snow_particles$n_snow_bin[i] != 0){
     start <- count+1
-    end <- start+n_snow_bin[i]-1
-    X[start:end] <- runif(n_snow_bin[i],snow_particles$startpoint[i],snow_particles$endpoint[i])
-    count <- count + n_snow_bin[i]
+    end <- start+snow_particles$n_snow_bin[i]-1
+    X[start:end] <- runif(snow_particles$n_snow_bin[i],snow_particles$startpoint[i],snow_particles$endpoint[i])
+    count <- count + snow_particles$n_snow_bin[i]
   }else{
     print("done")
     print(i)
@@ -79,17 +78,20 @@ em_alg <- function(data){
 }
 
 init_vals <- em_alg(X)
-
+init_vals
 ##############
 # Optimization
 ##############
 
 # Functions to get neg_likelihood
+
+# cdf of bilog_likelihood
 pmixnorm <- function(x,mu1,mu2,sigma1,sigma2,tau){
   y <- (1-tau)*plnorm(x,meanlog=mu1,sdlog=sigma1) + tau*plnorm(x,meanlog=mu2,sdlog=sigma2)
   return(y)
 }
-neg_loglikelihood <- function(par,n_elem,data){
+
+neg_loglikelihood <- function(par,data){
   # par = mu1,mu2,sigma1,sigma2,tau
   mu1<- par[1]
   mu2 <- par[2]
@@ -98,15 +100,15 @@ neg_loglikelihood <- function(par,n_elem,data){
   tau <- par[5]
   y <- 0
   for (i in 1:n_bins) { # data = snow_particles
-    y <- y + n_elem[i]*log(pmixnorm(data$endpoint[i],mu1,mu2,sigma1,sigma2,tau)-pmixnorm(data$startpoint[i],mu1,mu2,sigma1,sigma2,tau))
+    y <- y + data$n_snow_bin[i]*log(pmixnorm(data$endpoint[i],mu1,mu2,sigma1,sigma2,tau)-pmixnorm(data$startpoint[i],mu1,mu2,sigma1,sigma2,tau))
   }
   return(-y)
 }
 
 # optimizing from EM points
-theta_hat <- optim(init_vals,neg_loglikelihood)
+theta_hat <- optim(init_vals,neg_loglikelihood,data = snow_particles)
 
-
+theta_hat$par
 
 expected_val_1 <- exp(theta_hat$par[1]+theta_hat$par[3]^2/2)
 print(expected_val_1)
@@ -146,8 +148,8 @@ legend("topright", legend = c("Optimal","EM-based"), col=1:2, pch=1) # optional 
 
 # H_0 : diameters follow this bi-log normal distribution
 
-# 1) Utiliser X jitter
-# 2) Resample uniformly from X_jitter - X^b_jit
+# 1) Utiliser X jitter and resample uniformly from X_jitter - X^b_jit
+# 2) refaire le dataset pour avoir les nouveaux binnings -> avoir les start et end pareil mais juste changer les # elems
 # 3) Rerun the EM algorithm and the optimization step on the X^b_jit 
 # donc le f^b est la nouvelle phi binned avec le X^b_jit comparé à l'autre partie
 # 4) On récupère nos estimateurs lambda_b hat
@@ -156,9 +158,43 @@ legend("topright", legend = c("Optimal","EM-based"), col=1:2, pch=1) # optional 
 # - Repeat 1 to 5 B times
 # compute p-val and check whether it is high enough
 
-X_b <- sample(X,n_particules,replace = T)
-init_val_X_b <- em_alg(X_b)
-init_val_X_b
-opt_X_b <- optim(init_val_X_b,neg_loglikelihood)
+# Helper functions
+count_bins <- function(X, data){
+  counts <- rep(0,n_bins)
+  for (i in 1:n_bins){
+    start <- data$startpoint[i]
+    end <- data$endpoint[i]
+    counts[i] <- sum(start <= X & X <= end)
+  }
+  return(counts)
+}
 
-# voir optim pour ajouter n_bin et data jittered
+obj_func <- function(x, data) {
+  Fn <- ecdf(data[[1]])(x)
+  ecdf_diff <- abs(Fn - pmixnorm(x,mu1=data[[2]]$par[1],mu2=data[[2]]$par[2],sigma1=data[[2]]$par[3],sigma2=data[[2]]$par[4],tau=data[[2]]$par[5]))
+  return(-ecdf_diff) # maximize the absolute difference
+}
+
+B <- 15
+data <- snow_particles[c("startpoint","endpoint","n_snow_bin")]
+T_list <- numeric(B)
+for (b in 1:B) {
+  # 1) Resampling from jittering
+  X_b <- sample(X,n_particules,replace = T)
+  
+  # 2) Recreating the binning dataset
+  
+  counts <- count_bins(X_b,data)
+  data$n_snow_bin = counts
+  
+  # 3) Re-running the em algorithm 
+  init_val_X_b <- em_alg(X_b)
+  print(b)
+  # 4) Getting the best param estimators by optimizing the new neg_loglikelihood
+  opt_X_b <- optim(init_val_X_b,neg_loglikelihood,data=data)
+  print(opt_X_b)
+  # 5) Computing T*
+  opt_result <- optimize(obj_func, interval =c(0,snow_particles$endpoint[n_bins]), data = list(X,opt_X_b))
+  T_list[b] <- -opt_result$objective
+}
+T_list
