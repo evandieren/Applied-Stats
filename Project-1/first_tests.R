@@ -169,34 +169,51 @@ count_bins <- function(X, data){
   return(counts)
 }
 
-obj_func <- function(x, data) {
-  Fn <- ecdf(data[[1]])(x)
-  ecdf_diff <- abs(Fn - pmixnorm(x,mu1=data[[2]]$par[1],mu2=data[[2]]$par[2],sigma1=data[[2]]$par[3],sigma2=data[[2]]$par[4],tau=data[[2]]$par[5]))
-  return(-ecdf_diff) # maximize the absolute difference
-}
+#obj_func <- function(x, data) {
+#  Fn <- ecdf(data[[1]])(x)
+#  ecdf_diff <- abs(Fn - pmixnorm(x,mu1=data[[2]]$par[1],mu2=data[[2]]$par[2],sigma1=data[[2]]$par[3],sigma2=data[[2]]$par[4],tau=data[[2]]$par[5]))
+#  return(-ecdf_diff) # maximize the absolute difference
+#}
 
-B <- 100
+B <- 20
 data <- snow_particles[c("startpoint","endpoint","n_snow_bin")]
 T_list <- numeric(B)
-opt_result <- optimize(obj_func, interval =c(0,snow_particles$endpoint[n_bins]), data = list(X,theta_hat))
-T_ <- -opt_result$objective
+x_eval <- seq(from=0,to=snow_particles$endpoint[n_bins],length.out=1000) # creating breakpoints
+Fn <- ecdf(X)
+Fn_values <- Fn(x_eval) # values at left breakpoint
+F_hat_values <- sapply(x_eval,pmixnorm,
+                       mu1=theta_hat$par[1], mu2=theta_hat$par[2], 
+                       sigma1=theta_hat$par[3], sigma2=theta_hat$par[4], 
+                       tau=theta_hat$par[5])
+abs_err <- abs(Fn_values-F_hat_values)
+abs_err_max <- abs_err[which.max(abs_err)]
+T_ <- abs_err_max
+T_
 for (b in 1:B) {
   # 1) Resampling from jittering
   X_b <- sample(X,n_particules,replace = T)
-  
-  # 2) Recreating the binning dataset
+    
+  # 2) Updating the binning dataset from new X_b
   counts <- count_bins(X_b,data)
   data$n_snow_bin = counts
-  
+    
   # 3) Re-running the em algorithm 
   init_val_X_b <- em_alg(X_b)
   print(b)
+  
   # 4) Getting the best param estimators by optimizing the new neg_loglikelihood
   opt_X_b <- optim(init_val_X_b,neg_loglikelihood,data=data)
   # 5) Computing T*
-  opt_result <- optimize(obj_func, interval =c(0,snow_particles$endpoint[n_bins]), data = list(X_b,opt_X_b))
-  T_list[b] <- -opt_result$objective
-  print(-opt_result$objective)
+  Fn <- ecdf(X_b)
+  Fn_values <- Fn(x_eval) # values at left breakpoint
+  F_hat_values <- sapply(x_eval,pmixnorm,
+                    mu1=opt_X_b$par[1], mu2=opt_X_b$par[2], 
+                    sigma1=opt_X_b$par[3], sigma2=opt_X_b$par[4], 
+                    tau=opt_X_b$par[5])
+  abs_err <- abs(Fn_values-F_hat_values)
+  abs_err_max <- abs_err[which.max(abs_err)]
+  T_list[b] <- abs_err_max
 }
+
 p_val = 1/(B+1)*(1+sum(T_<=T_list))
 p_val
