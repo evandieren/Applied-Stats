@@ -1,4 +1,5 @@
 library(readr)
+
 snow_particles <- read_csv("1_snow_particles.csv")
 n_bins <- length(snow_particles$startpoint)
 snow_particles$endpoint[n_bins] <- snow_particles$endpoint[n_bins-1]+0.25
@@ -12,16 +13,18 @@ width <- rep(0,n_bins)
 for (i in 1:n_bins){
   width[i] = snow_particles$endpoint[i]-snow_particles$startpoint[i]
 }
-bp <- barplot(height = snow_particles$n_snow_bin,
+
+png(file="./plots/snow_distribution.png",width=1200, height=700)
+bp <- barplot(height = snow_particles$n_snow_bin/n_particules,
               width = width,
               xlim = c(breakpoints[1], breakpoints[length(breakpoints)]), 
-              ylim = c(0, max(snow_particles$n_snow_bin) * 1.1), 
+              #ylim = c(0, max(snow_particles$n_snow_bin) * 1.1), 
               xlab = "Snowflakes diameter", 
               ylab = "Number of snowflakes",
               main = "Snowflake distribution",
-              cex.axis = 0.75,cex.names = 0.7)
-axis(side=1, at =bp,label=snow_particles$startpoint,cex.axis = 0.75)
-
+              cex.axis = 1,cex.names = 0.8)
+axis(side=1, at =bp,label=snow_particles$startpoint,cex.axis = 1)
+dev.off()
 
 # Jittering
 
@@ -62,7 +65,7 @@ em_alg <- function(data){
   N <- n_particules
   p <- dlnorm(data,meanlog=mu_2_hat,sdlog=sigma_2_hat)*tau_hat/dmixnorm(data,mu_1_hat, mu_2_hat, sigma_1_hat, sigma_2_hat, tau_hat)
   l_old <- Inf
-  l <- sum((1-tau_hat)*dlnorm(data,meanlog=mu_1_hat,sdlog=sigma_1_hat) + tau_hat*dlnorm(data,meanlog=mu_2_hat,sdlog=sigma_2_hat))
+  l <- sum(log((1-tau_hat)*dlnorm(data,meanlog=mu_1_hat,sdlog=sigma_1_hat) + tau_hat*dlnorm(data,meanlog=mu_2_hat,sdlog=sigma_2_hat)))
   while (abs(l-l_old)>0.01){
     tau_hat <- sum(p)/N
     mu_1_hat <- sum((1-p)*log(data))/sum(1-p)
@@ -72,7 +75,7 @@ em_alg <- function(data){
     
     p <- dlnorm(data,meanlog=mu_2_hat,sdlog=sigma_2_hat)*tau_hat/dmixnorm(data, mu_1_hat, mu_2_hat, sigma_1_hat, sigma_2_hat, tau_hat)
     l_old <- l
-    l <- sum((1-tau_hat)*dlnorm(data,meanlog=mu_1_hat,sdlog=sigma_1_hat) + tau_hat*dlnorm(data,meanlog=mu_2_hat,sdlog=sigma_2_hat))
+    l <- sum(log((1-tau_hat)*dlnorm(data,meanlog=mu_1_hat,sdlog=sigma_1_hat) + tau_hat*dlnorm(data,meanlog=mu_2_hat,sdlog=sigma_2_hat)))
   }
   return(c(mu_1_hat,mu_2_hat,sigma_1_hat,sigma_2_hat,tau_hat))
 }
