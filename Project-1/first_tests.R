@@ -14,7 +14,7 @@ for (i in 1:n_bins){
   width[i] = snow_particles$endpoint[i]-snow_particles$startpoint[i]
 }
 
-png(file="./plots/snow_distribution.png",width=1200, height=700)
+#png(file="./plots/snow_distribution.png",width=1200, height=700)
 bp <- barplot(height = snow_particles$n_snow_bin/n_particules,
               width = width,
               xlim = c(breakpoints[1], breakpoints[length(breakpoints)]), 
@@ -24,7 +24,7 @@ bp <- barplot(height = snow_particles$n_snow_bin/n_particules,
               main = "Snowflake distribution",
               cex.axis = 1,cex.names = 0.8)
 axis(side=1, at =bp,label=snow_particles$startpoint,cex.axis = 1)
-dev.off()
+#dev.off()
 
 # Jittering
 
@@ -113,17 +113,6 @@ theta_hat <- optim(init_vals,neg_loglikelihood,data = snow_particles)
 
 theta_hat$par
 
-expected_val_1 <- exp(theta_hat$par[1]+theta_hat$par[3]^2/2)
-print(expected_val_1)
-expected_val_2 <- exp(theta_hat$par[2]+theta_hat$par[4]^2/2)
-print(expected_val_2)
-std_var_1 <- sqrt((exp(theta_hat$par[3]^2)-1)*exp(2*theta_hat$par[1]+theta_hat$par[3]^2))
-print(std_var_1)
-std_var_2 <- sqrt((exp(theta_hat$par[4]^2)-1)*exp(2*theta_hat$par[2]+theta_hat$par[4]^2))
-print(std_var_2)
-tau_opt <- theta_hat$par[5]
-print(tau_opt)
-
 ##########
 # Plotting
 ##########
@@ -140,11 +129,12 @@ vals_em <- sapply(breaks_hist[1:length(breaks_hist)-1],dmixnorm,
                   sigma1=init_vals[3], sigma2=init_vals[4], 
                   tau=init_vals[5])
 # PLOT EM VALS pdf
-plot(breaks_hist[1:length(breaks_hist)-1],vals_hist)
+#png("./plots/EM_opt_dist.png",width=1200, height=700)
+plot(breaks_hist[1:length(breaks_hist)-1],vals_hist,xlab="Snowflake diameters",ylab="Distribution")
 lines(x=breaks_hist[1:length(breaks_hist)-1],y=vals,type="l")
 lines(x=breaks_hist[1:length(breaks_hist)-1],y=vals_em,type="l",col=2)
-legend("topright", legend = c("Optimal","EM-based"), col=1:2, pch=1) # optional legend
-
+legend("topright", legend = c("Optimal","EM-based"), col=1:2,lty=1) # optional legend
+#dev.off()
 ##################################
 # LAST-STEP | Parametric bootstrap
 ##################################
@@ -171,12 +161,6 @@ count_bins <- function(X, data){
   }
   return(counts)
 }
-
-#obj_func <- function(x, data) {
-#  Fn <- ecdf(data[[1]])(x)
-#  ecdf_diff <- abs(Fn - pmixnorm(x,mu1=data[[2]]$par[1],mu2=data[[2]]$par[2],sigma1=data[[2]]$par[3],sigma2=data[[2]]$par[4],tau=data[[2]]$par[5]))
-#  return(-ecdf_diff) # maximize the absolute difference
-#}
 
 B <- 20
 data <- snow_particles[c("startpoint","endpoint","n_snow_bin")]
@@ -220,3 +204,4 @@ for (b in 1:B) {
 
 p_val = 1/(B+1)*(1+sum(T_<=T_list))
 p_val
+
