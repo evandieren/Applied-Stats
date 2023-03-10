@@ -1,0 +1,44 @@
+---
+title: "Rough-Work"
+author: "Eliott Van Dieren"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+load("2_online_shopping.RData")
+```
+
+## Data exploration
+
+```{r}
+names(Data) <- c("n_admin_page","time_admin_page","n_info_page",
+                 "time_info_page","n_product_page","time_product_page",
+                 "bounce_rates","exit_rates","page_values","special_day",
+                 "month","os","browser","region","traffic_type","visitor_type",
+                 "weekend","purchase")
+
+Data <- Data %>% mutate(os=as.factor(os), browser=as.factor(browser),
+                        region=as.factor(region),weekend = as.factor(weekend),
+                        traffic_type=as.factor(traffic_type),
+                        purchase=as.factor(purchase),month=as.factor(month),
+                        visitor_type=as.factor(visitor_type))
+str(Data)
+n_cols <- dim(Data)[2]
+```
+
+```{r}
+par(mfrow=c(2,n_cols/2 + n_cols%%2))
+for(i in 1:n_cols){
+  hist(as.numeric(Data[,i]),
+                  main = paste("Histogram of", names(Data)[i]))
+}
+```
+
+From that, one might think of grouping the browsers together as they are relatively low compared to the first one -> binomial class "0" or "1" being other
+
+Next plot : create a gm and then plot the residuals vs regressors to find non-linear dependencies (+ use anova tests and stuff to check whether those models make sense).
+
+

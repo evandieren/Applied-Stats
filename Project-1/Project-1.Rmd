@@ -65,6 +65,7 @@ knitr::include_graphics("plots/EM_opt_dist.png")
 Finally, the last step now that we have the optimal parameters' estimators, is to test whether the diameters come from a bi-log-normal distribution. To do so, we apply the following methodology to estimate a p-value for the following hypothesis-testing :
 
 $$H_0 = X \sim f_X, \quad H_1 = X \nsim f_X $$ where $f_X$ is defined in [1. Introduction]
+
 * Set $B$ the number of bootstraps
 * Compute $F_N$ the ECDF of $X_j$ and define $F_{\hat{\theta}}$ the cdf of a bi-lognormal distribution with parameters $\hat{\theta}$.
 * Compute the statistics : $T := \sup_{x} |F_N(x) - F_{\hat{\theta}}(x)|$
