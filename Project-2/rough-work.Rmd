@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(car)
 load("2_online_shopping.RData")
 ```
 
@@ -20,24 +21,90 @@ names(Data) <- c("n_admin_page","time_admin_page","n_info_page",
                  "month","os","browser","region","traffic_type","visitor_type",
                  "weekend","purchase")
 
-Data <- Data %>% mutate(os=as.factor(os), browser=as.factor(browser),
+str(Data)
+
+factors <- 11:18
+
+# Numerical data (for histograms)
+Data_n <- Data %>% mutate(month=match(month,month.abb),
+                          visitor_type=as.numeric(as.factor(visitor_type)))
+
+# Factored data
+Data_f <- Data %>% mutate(os=as.factor(os), browser=as.factor(browser),
                         region=as.factor(region),weekend = as.factor(weekend),
                         traffic_type=as.factor(traffic_type),
                         purchase=as.factor(purchase),month=as.factor(month),
                         visitor_type=as.factor(visitor_type))
-str(Data)
-n_cols <- dim(Data)[2]
+# Merging the factored data
+for (i in factors){
+  count_table <- table(Data_f[,i])
+  Data_f[,i] <- fct_collapse(Data_f[,i],other=names(count_table[count_table<50]))
+}
+
+table(Data_f$browser)
+```
+
+Above, we created two dataset, one factoring and merging low categorical values (ex. browser etc). We also created a numerical dataset for histogram plotting where the visitor_type became 1,2,3 being New_Visitor, Other and Returning_Visitor
+
+```{r}
+#par(mfrow=c(2,n_cols/2 + n_cols%%2))
+#for(i in 1:n_cols){
+#  hist(as.numeric(Data[,i]),
+#                  main = paste("Histogram of", names(Data)[i]))
+#}
+
+# Histogram plotting
+
+Data_n %>% pivot_longer(everything()) %>% ggplot(aes(value)) +
+  facet_wrap(~ name, scales = "free") + geom_histogram()
+```
+Comment this original dataset and talk about the merging and factoring certain values from those histograms distributions
+
+```{r}
+gm0 <- glm(purchase~., data=Data_f,family = "binomial")
+Anova(gm0,type=2,test="LR")
 ```
 
 ```{r}
-par(mfrow=c(2,n_cols/2 + n_cols%%2))
-for(i in 1:n_cols){
-  hist(as.numeric(Data[,i]),
-                  main = paste("Histogram of", names(Data)[i]))
+Data_n %>%
+  mutate(res=resid(gm0)) %>%
+  pivot_longer(-res) %>% ggplot(aes(y=res,x=value)) +
+  facet_wrap(~ name, scales = "free") + geom_point() + geom_smooth()
+```
+We can see a quadratic relation between page_values and a split there too.
+```{r}
+gm1 <- glm(purchase~. + I(page_values^2) + I(time_product_page^2), data=Data_f,family = "binomial")
+anova(gm0,gm1,test="LR")
+
+
+AIC(gm0,gm1)
+
+summary(gm1)
+
+```
+```{r}
+library(pROC)
+AUC_eval <- function(gmodel,Data){
+  set.seed(517)
+  Folds <- matrix(sample(1:dim(Data)[1]), ncol=5)
+  AUC <- rep(0,5)
+  for(k in 1:5){
+    train <- Data[-Folds[,k],]
+    test <- Data[Folds[,k],]
+    my_gm <- glm(gmodel$formula, family="binomial", data=train)
+    test_pred <- predict(my_gm, newdata = test, type="response")
+    AUC[k] <- auc(test$purchase,test_pred)
 }
+  return(mean(AUC))
+}
+AUC_eval(gm1,Data)
+
 ```
 
-From that, one might think of grouping the browsers together as they are relatively low compared to the first one -> binomial class "0" or "1" being other
+TODO 
+
+* Checker les valeurs des histogrammes et tapper un log si y'a trop de disparités dans les valeurs, afin de prédire des valeurs + proches plutôt que des grands écarts. check for outliers
+* Construct a glm with "binomial" and plot the residuals
 
 Next plot : create a gm and then plot the residuals vs regressors to find non-linear dependencies (+ use anova tests and stuff to check whether those models make sense).
 
