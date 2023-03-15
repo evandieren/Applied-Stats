@@ -12,7 +12,7 @@ library(car)
 load("2_online_shopping.RData")
 ```
 
-## Data exploration
+## Renaming and factoring data thanks to histogram
 
 ```{r}
 names(Data) <- c("n_admin_page","time_admin_page","n_info_page",
@@ -41,6 +41,7 @@ for (i in factors){
   Data_f[,i] <- fct_collapse(Data_f[,i],other=names(count_table[count_table<50]))
 }
 
+# verif "other" factor
 table(Data_f$browser)
 ```
 
@@ -54,7 +55,7 @@ Above, we created two dataset, one factoring and merging low categorical values 
 #}
 
 # Histogram plotting
-
+par(mfrow=c(2,9))
 Data_n %>% pivot_longer(everything()) %>% ggplot(aes(value)) +
   facet_wrap(~ name, scales = "free") + geom_histogram()
 ```
@@ -63,7 +64,38 @@ Comment this original dataset and talk about the merging and factoring certain v
 ```{r}
 gm0 <- glm(purchase~., data=Data_f,family = "binomial")
 Anova(gm0,type=2,test="LR")
+summary(gm0)
 ```
+The above test tells us what happens when we are dropping a single predictor from a saturated model. Here we observe that traffic_type, the month, exit_rates, time_product_page and page_values are statistically significant.
+
+```{r}
+gm_t <- glm(purchase~.*weekend, data=Data_f,family = "binomial")
+Anova(gm_t,type=2,test="LR")
+```
+visitor_type:weekend might be interested, os:weekend also but might not be really relevant if we think about it. The first makes more sense, as visitor type might change depending on the day of the week
+
+
+## Contingency tables for factor covariate
+
+```{r}
+table(Data_f$purchase, Data_f$visitor_type)
+```
+With those 2-way tables cross classifying the outcome depending on the type of visitor, we observe that there is 25% of buying when new visitors, and 15% for returning visitors, but there is much more volume for the returning visitors than the new visitors. Without doing a formal test, those percentages seem already different.
+
+```{r}
+table(Data_f$purchase, Data_f$month)
+```
+
+```{r}
+table(Data_f$purchase, Data_f$month)
+```
+
+
+
+
+
+
+
 
 ```{r}
 Data_n %>%
