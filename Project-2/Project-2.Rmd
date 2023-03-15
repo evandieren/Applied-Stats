@@ -1,0 +1,120 @@
+---
+title: "Project 2 - e-commerce purchase prediction"
+author: "Eliott Van Dieren"
+date: "`r Sys.Date()`"
+output: bookdown::html_document2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(car)
+library(knitr)
+library(kableExtra)
+library(pROC)
+load("2_online_shopping.RData")
+```
+
+# Introduction
+
+During the last few decades, the usage of the internet has been tremendously important for businesses around the world, and the word e-commerce became the norm when talking about shopping. Today, and especially for younger people, the first reflex to buy anything would be to check online and buy their products from their preferred brands' websites. Those companies who sell products online therefore gather lots of data about their customers and can use it to predict customers' behavior and purchase habits to increase their total sales. This may be done by understanding which features are the most important to predict customers' purchases. In this project, we present a way to predict a purchase of a given customer given his activity on the website. This is done by using a logistic regression model which suits the prediction of categorical data (purchase or not) quite well when compared to other types de models such as linear regression.
+
+In this project, we first start by exploring the given dataset, by describing its columns and by wrangling it to get better features for the prediction task. Then, we start looking at the logistic regression model creation thanks to statistical tests such as [ANOVA](https://en.wikipedia.org/wiki/Analysis_of_variance) and their performance thanks to [AIC](https://en.wikipedia.org/wiki/Akaike_information_criterion), [BIC](https://en.wikipedia.org/wiki/Bayesian_information_criterion) and [AUC](https://en.wikipedia.org/wiki/Receiver_operating_characteristic). We then plot some results about the final model regarding various metrics of interest and lastly conclude on the results we obtain and further steps.
+
+# Data exploration
+
+## Dataset Description
+
+The studied [dataset](https://archive.ics.uci.edu/ml/datasets/Online+Shoppers+Purchasing+Intention+Dataset) contains a list of customers' session on a given website with several features described below. Each of the 11630 rows represents one customer's session, ending with a purchase or not. Each session belongs to a different user in a 1-year period to avoid any tendency to a specific campaign, special day, user profile, or period.
+
+Description of the dataset columns following by its - `relabelling` for clarity purposes:
+
+* `Administrative` : number of administrative-type pages that the user visited - `n_admin_page`
+* `Administrative_Duration` : time spent on administrative pages - `time_admin_page`
+* `Informational` : number of informational-type pages visited - `n_info_page`
+* `Informational_Duration` : time spent on informational-type pages - `time_info_page`
+* `ProductRelated` : number of product-related-type pages visited - `n_product_page`
+* `ProductRelated_Duration` : time spent on product-related-type pages - `time_product_page`
+* `BounceRates` : average bounce rate of pages visited (for a specific webpage, the bounce rate is the percentage of users who enter the webpage and then leave without triggering any other requests during their sessions) - `bounce_rates`
+* `ExitRates` : average exit rate of pages visited (for a specific webpage, the exit rate is the proportion of page views to the page that were the last in the session) - `exit_rates`
+* `PageValues` : average page value of pages visited (for a specific webpage, the page value gives an idea of how much each page contributes to the site’ revenue) - `page_values`
+* `SpecialDay` : value in $[0,1]$ indicating closeness of the session to a special day (e.g. Mother’s day, etc.) taking into account delivery, etc. (e.g. special_day $> 0$ from Feb $2$ reaching value $1$ on Feb $12$) - `special_day`
+* `Month` : which month the session took place - `month`
+* `OperatingSystems` : operating systems of the users coded as integers - `os`
+* `Browser` : type of web browser of the users coded as integers - `browser`
+* `Region` : geographic region in which the user is located coded as integers - `region`
+* `TrafficType` : where from the user arrived at the site (e.g. ad banner, SMS link, direct URL, etc.) coded as integers - `traffic_type`
+* `VisitorType` : type of visitor (either Returning, New or Other type of visitor) - `visitor_type`
+* `Weekend` : binary indicator of whether the session took place during a weekend - `weekend`
+* `Revenue` : the response variable, 0/1 indicating whether a purchase was made or not - `purchase`
+
+## Dataset transformations
+
+First, one can plot histograms for each of the column of the dataset and therefore observe their respective distributions. As seen in Fig $1.$, some features can be seen as factors and should therefore be mutated in the dataset by using the `as.factor` command. We list as factor the following list of columns : `month`,`os`,`browser`,`region`,`traffic_type`,`visitor_type`,`weekend`and `purchase`.
+ 
+```{r, echo=FALSE, message=FALSE, fig.height=6,fig.width=12,fig.align='center'}
+names(Data) <- c("n_admin_page","time_admin_page","n_info_page",
+                 "time_info_page","n_product_page","time_product_page",
+                 "bounce_rates","exit_rates","page_values","special_day",
+                 "month","os","browser","region","traffic_type","visitor_type",
+                 "weekend","purchase")
+
+factors <- 11:18
+# Factored data
+Data <- Data %>% mutate(os=as.factor(os), browser=as.factor(browser),
+                        region=as.factor(region),weekend = as.factor(weekend),
+                        traffic_type=as.factor(traffic_type),
+                        purchase=as.factor(purchase),month=as.factor(month),
+                        visitor_type=as.factor(visitor_type))
+
+Data %>% mutate_if(is.factor,as.numeric) %>% pivot_longer(everything()) %>% ggplot(aes(value)) + geom_histogram() + labs(title = "Distribution of features", caption="Fig 1 : Distribution of each feature of the dataset",
+       y = "Distribution", x = "feature value") + theme(axis.text=element_text(size=13),
+        axis.title=element_text(size=15,face="bold"),title= element_text(size=20,face="bold"),
+        plot.caption = element_text(size=15)) + facet_wrap(~ name, scales = "free")
+
+# Merging the factored data
+for (i in factors){
+  count_table <- table(Data[,i])
+  Data[,i] <- fct_collapse(Data[,i],other=names(count_table[count_table<50]))
+}
+```
+
+Secondly, for each of those categorical columns, the factors with less than $50$ observation are merged into a "other" factor to reduce the number of factors and indirectly the number of dummy variables for each category in the following sections. 
+
+As seen in Fig. $1$, the time spent on a given type of page, i.e. product, admin or info has a few high values, especially the time spent on product-related page. In order to avoid those large ranges of values which might harm the prediction result due to different order of magnitudes, one can either think about a log-transformation, i.e. $x \mapsto \log(1+x)$ to take care of zero values and decrease the range of values or on the other hand, transform those time-related columns to average time spent per number of pages of each category. In this project, the second option was used to avoid applying some trick such as the log transforms on time and keep intuition about the column used in the model. We therefore replace the columns `time_admin_page`,`time_info_page` and `time_product_page` by `avg_time_admin_page`,`avg_time_info_page` and `avg_time_product_page`. As seen in Fig. $2$, values which were of order $0-10^5$ become of order $0-10^3$ for the time spent on product-related for example, which is already more reasonable.
+
+```{r, echo=FALSE,message=FALSE,fig.align='center',fig.height=4,fig.width=8}
+quotient_prod <- rep(0, nrow(Data)) # initialize the quotient vector
+zero_denom_prod <- which(Data[, "n_product_page"] == 0) # find indices where denominator is 0
+quotient_prod[-zero_denom_prod] <- Data[, "time_product_page"][-zero_denom_prod] / Data[, "n_product_page"][-zero_denom_prod]
+
+quotient_info <- rep(0, nrow(Data)) # initialize the quotient vector
+zero_denom_info <- which(Data[, "n_info_page"] == 0) # find indices where denominator is 0
+quotient_info[-zero_denom_info] <- Data[, "time_info_page"][-zero_denom_info] / Data[, "n_info_page"][-zero_denom_info]
+
+quotient_admin <- rep(0, nrow(Data)) # initialize the quotient vector
+zero_denom_admin <- which(Data[, "n_admin_page"] == 0) # find indices where denominator is 0
+quotient_admin[-zero_denom_admin] <- Data[, "time_admin_page"][-zero_denom_admin] / Data[, "n_admin_page"][-zero_denom_admin]
+
+Data <- Data %>% select(-time_product_page,-time_admin_page,-time_info_page) %>% mutate(avg_time_product_page = quotient_prod,avg_time_admin_page = quotient_admin,avg_time_info_page = quotient_info)
+
+ Data %>% select(avg_time_product_page,avg_time_admin_page,avg_time_info_page) %>% pivot_longer(everything()) %>% ggplot(aes(value)) + geom_histogram() + labs(title = "Distribution of avg. time features", caption="Fig 2 : Distribution of time features of the dataset",
+       y = "Distribution", x = "feature value") + theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=10,face="bold"),title= element_text(size=15,face="bold"),
+        plot.caption = element_text(size=12)) + facet_wrap(~ name, scales = "free")
+
+```
+
+# Logisitic regression model creation
+
+As discussed in [Introduction], we will try to fit a logistic regression model to the given dataset and get meaningful categorical predictions depending on a given probability threshold for a purchase on the website.
+
+## Finding the statistically relevant variables
+
+## Deeper look at the residuals
+
+## Adding interactions
+
+## Discussion about the model
+
+# Conclusion

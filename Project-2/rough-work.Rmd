@@ -9,20 +9,21 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(car)
-load("2_online_shopping.RData")
+library(knitr)
+library(kableExtra)
 library(pROC)
+
+load("2_online_shopping.RData")
 ```
 
 ## Renaming and factoring data thanks to histogram
 
-```{r}
+```{r, echo=FALSE, message=FALSE}
 names(Data) <- c("n_admin_page","time_admin_page","n_info_page",
                  "time_info_page","n_product_page","time_product_page",
                  "bounce_rates","exit_rates","page_values","special_day",
                  "month","os","browser","region","traffic_type","visitor_type",
                  "weekend","purchase")
-
-str(Data)
 
 factors <- 11:18
 
@@ -51,10 +52,7 @@ quotient_admin <- rep(0, nrow(Data_f)) # initialize the quotient vector
 zero_denom_admin <- which(Data_f[, "n_admin_page"] == 0) # find indices where denominator is 0
 quotient_admin[-zero_denom_admin] <- Data_f[, "time_admin_page"][-zero_denom_admin] / Data_f[, "n_admin_page"][-zero_denom_admin]
 
-
-
 Data_f <- Data_f %>% mutate(time_product_page = quotient_prod,time_admin_page = quotient_admin,time_info_page = quotient_info)
-
 
 # verif "other" factor
 table(Data_f$browser)
@@ -75,6 +73,9 @@ AUC_eval <- function(gmodel,Data){
 }
 
 ```
+
+
+By having a closer look to the data, we can identify factors such as the 
 
 Above, we created two dataset, one factoring and merging low categorical values (ex. browser etc). We also created a numerical dataset for histogram plotting where the visitor_type became 1,2,3 being New_Visitor, Other and Returning_Visitor
 
