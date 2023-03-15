@@ -111,6 +111,12 @@ As discussed in [Introduction], we will try to fit a logistic regression model t
 
 ## Finding the statistically relevant variables
 
+First, we start with a basic logistic regression model using every possible covariate (variable in the dataset). We then use the ANOVA of type $2$ with a Loglikelihood Ratio Test to assess whether a certain covariate is statistically significant. More precisely, the ANOVA is a statistical process for analyzing the amount of variance that is contributed to a sample by different variables. One can see the type II as the comparison of the model from which we would remove one variable at a time and the saturated model. Then, by examining the marginal contribution of a given covariate, one can assess its statistical significance regarding the target's prediction.
+
+```{r, echo=FALSE,message=FALSE}
+gm0 <- glm(purchase~., data=Data,family = "binomial")
+Anova(gm0,type=2,test="LR")
+```
 ## Deeper look at the residuals
 
 ## Adding interactions
