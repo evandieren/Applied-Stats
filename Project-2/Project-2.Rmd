@@ -12,6 +12,7 @@ library(car)
 library(knitr)
 library(kableExtra)
 library(pROC)
+library(flexmix)
 load("2_online_shopping.RData")
 ```
 
@@ -67,7 +68,7 @@ Data <- Data %>% mutate(os=as.factor(os), browser=as.factor(browser),
                         purchase=as.factor(purchase),month=as.factor(month),
                         visitor_type=as.factor(visitor_type))
 
-Data %>% mutate_if(is.factor,as.numeric) %>% pivot_longer(everything()) %>% ggplot(aes(value)) + geom_histogram() + labs(title = "Distribution of features", caption="Fig 1 : Distribution of each feature of the dataset",
+Data %>% mutate_if(is.factor,as.numeric) %>% pivot_longer(everything()) %>% ggplot(aes(value)) + geom_histogram(aes(y=..density..)) + labs(title = "Distribution of features", caption="Fig 1 : Distribution of each feature of the dataset",
        y = "Distribution", x = "feature value") + theme(axis.text=element_text(size=13),
         axis.title=element_text(size=15,face="bold"),title= element_text(size=20,face="bold"),
         plot.caption = element_text(size=15)) + facet_wrap(~ name, scales = "free")
@@ -102,7 +103,6 @@ Data <- Data %>% select(-time_product_page,-time_admin_page,-time_info_page) %>%
        y = "Distribution", x = "feature value") + theme(axis.text=element_text(size=12),
         axis.title=element_text(size=10,face="bold"),title= element_text(size=15,face="bold"),
         plot.caption = element_text(size=12)) + facet_wrap(~ name, scales = "free")
-
 ```
 
 # Logisitic regression model creation
@@ -111,13 +111,44 @@ As discussed in [Introduction], we will try to fit a logistic regression model t
 
 ## Finding the statistically relevant variables
 
-First, we start with a basic logistic regression model using every possible covariate (variable in the dataset). We then use the ANOVA of type $2$ with a Loglikelihood Ratio Test to assess whether a certain covariate is statistically significant. More precisely, the ANOVA is a statistical process for analyzing the amount of variance that is contributed to a sample by different variables. One can see the type II as the comparison of the model from which we would remove one variable at a time and the saturated model. Then, by examining the marginal contribution of a given covariate, one can assess its statistical significance regarding the target's prediction.
+First, we start with a basic logistic regression model using every possible covariate (variable in the dataset) called $glm_0$. We then use the ANOVA of type $2$ with a Loglikelihood Ratio Test to assess whether a certain covariate is statistically significant. More precisely, the ANOVA is a statistical process for analyzing the amount of variance that is contributed to a sample by different variables. One can see the type II as the comparison of the model from which we would remove one variable at a time and the saturated model. Then, by examining the marginal contribution of a given covariate, one can assess its statistical significance regarding the target's prediction.
 
 ```{r, echo=FALSE,message=FALSE}
-gm0 <- glm(purchase~., data=Data,family = "binomial")
-Anova(gm0,type=2,test="LR")
+AUC_eval <- function(gmodel,Data){
+  set.seed(517)
+  Folds <- matrix(sample(1:dim(Data)[1]), ncol=5)
+  AUC <- rep(0,5)
+  for(k in 1:5){
+    train <- Data[-Folds[,k],]
+    test <- Data[Folds[,k],]
+    my_gm <- glm(gmodel$formula, family="binomial", data=train)
+    test_pred <- predict(my_gm, newdata = test, type="response")
+    AUC[k] <- auc(test$purchase,test_pred)
+}
+  return(mean(AUC))
+}
+
+glm0 <- glm(purchase~., data=Data,family = "binomial")
+Anova(glm0,type=2,test="LR")
+#cat(AUC_eval(glm0,Data)) # 0.8844597
+#AIC(glm0) # 7171.662
+#BIC(glm0) # 7583.897
 ```
+As seen from the results of the ANOVA II-test on $glm_0$, we observe a few statistically significant covariates (p-value less than $0.1$): `n_product_page`,`exit_rates`,`page_values`,`month`,`traffic_type`,`visitor_type`,`avg_time_product_page`, but one can note that the last two are less significant than the others by several orders of magnitude. From this full model, we get an AUC of $0.884$ which is below the targeted benchmark of $0.895$. For the sake of completeness, we get an AIC of $7172$ and a BIC of $7584$. 
+
+```{r, echo=FALSE, message=FALSE}
+glm_sig <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type + avg_time_product_page, data=Data,family = "binomial")
+#Anova(glm_sig,type=2,test="LR") # everything is significant (as expected)
+cat(AUC_eval(glm_sig,Data)) # 0.8878329
+AIC(glm_sig) # 7145.045
+BIC(glm_sig) # 7343.802
+
+anova(glm0,glm_sig,test="LRT")
+```
+The next step is to fit the model containing only the statistically significant covariates, which we will call $glm_{sig}$. With this model, we obtain an AUC of $0.8878$, an AIC of $7145$ and a BIC of $7344$. All those metrics are slightly better than $glm_0$, even though the model-submodel test using the Loglikelihood ratio test has a p-value of $0.35$.
 ## Deeper look at the residuals
+Now that we have a basic logistic regression model $glm_{sig}$, one can plot the residuals vs the covariates and assess whether there are non-linear relations which might have been missed and could contribute to better target prediction.
+
 
 ## Adding interactions
 
