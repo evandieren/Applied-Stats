@@ -53,7 +53,7 @@ Description of the dataset columns following by its - `relabelling` for clarity 
 
 First, one can plot histograms for each of the column of the dataset and therefore observe their respective distributions. As seen in Fig $1.$, some features can be seen as factors and should therefore be mutated in the dataset by using the `as.factor` command. We list as factor the following list of columns : `month`,`os`,`browser`,`region`,`traffic_type`,`visitor_type`,`weekend`and `purchase`.
  
-```{r, echo=FALSE, message=FALSE, fig.height=6,fig.width=12,fig.align='center'}
+```{r, echo=FALSE, message=FALSE, fig.height=6,fig.width=12,fig.align='center',warning=FALSE}
 names(Data) <- c("n_admin_page","time_admin_page","n_info_page",
                  "time_info_page","n_product_page","time_product_page",
                  "bounce_rates","exit_rates","page_values","special_day",
@@ -84,7 +84,7 @@ Secondly, for each of those categorical columns, the factors with less than $50$
 
 As seen in Fig. $1$, the time spent on a given type of page, i.e. product, admin or info has a few high values, especially the time spent on product-related page. In order to avoid those large ranges of values which might harm the prediction result due to different order of magnitudes, one can either think about a log-transformation, i.e. $x \mapsto \log(1+x)$ to take care of zero values and decrease the range of values or on the other hand, transform those time-related columns to average time spent per number of pages of each category. In this project, the second option was used to avoid applying some trick such as the log transforms on time and keep intuition about the column used in the model. We therefore replace the columns `time_admin_page`,`time_info_page` and `time_product_page` by `avg_time_admin_page`,`avg_time_info_page` and `avg_time_product_page`. As seen in Fig. $2$, values which were of order $0-10^5$ become of order $0-10^3$ for the time spent on product-related for example, which is already more reasonable.
 
-```{r, echo=FALSE,message=FALSE,fig.align='center',fig.height=4,fig.width=8}
+```{r, echo=FALSE,message=FALSE,fig.align='center',fig.height=4,fig.width=8,warning=FALSE}
 quotient_prod <- rep(0, nrow(Data)) # initialize the quotient vector
 zero_denom_prod <- which(Data[, "n_product_page"] == 0) # find indices where denominator is 0
 quotient_prod[-zero_denom_prod] <- Data[, "time_product_page"][-zero_denom_prod] / Data[, "n_product_page"][-zero_denom_prod]
@@ -99,7 +99,7 @@ quotient_admin[-zero_denom_admin] <- Data[, "time_admin_page"][-zero_denom_admin
 
 Data <- Data %>% select(-time_product_page,-time_admin_page,-time_info_page) %>% mutate(avg_time_product_page = quotient_prod,avg_time_admin_page = quotient_admin,avg_time_info_page = quotient_info)
 
- Data %>% select(avg_time_product_page,avg_time_admin_page,avg_time_info_page) %>% pivot_longer(everything()) %>% ggplot(aes(value)) + geom_histogram() + labs(title = "Distribution of avg. time features", caption="Fig 2 : Distribution of time features of the dataset",
+ Data %>% select(avg_time_product_page,avg_time_admin_page,avg_time_info_page) %>% pivot_longer(everything()) %>% ggplot(aes(value)) + geom_histogram(aes(y = ..density..)) + labs(title = "Distribution of avg. time features", caption="Fig 2 : Distribution of time features of the dataset",
        y = "Distribution", x = "feature value") + theme(axis.text=element_text(size=12),
         axis.title=element_text(size=10,face="bold"),title= element_text(size=15,face="bold"),
         plot.caption = element_text(size=12)) + facet_wrap(~ name, scales = "free")
@@ -113,7 +113,7 @@ As discussed in [Introduction], we will try to fit a logistic regression model t
 
 First, we start with a basic logistic regression model using every possible covariate (variable in the dataset) called $glm_0$. We then use the ANOVA of type $2$ with a Loglikelihood Ratio Test to assess whether a certain covariate is statistically significant. More precisely, the ANOVA is a statistical process for analyzing the amount of variance that is contributed to a sample by different variables. One can see the type II as the comparison of the model from which we would remove one variable at a time and the saturated model. Then, by examining the marginal contribution of a given covariate, one can assess its statistical significance regarding the target's prediction.
 
-```{r, echo=FALSE,message=FALSE}
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
 AUC_eval <- function(gmodel,Data){
   set.seed(517)
   Folds <- matrix(sample(1:dim(Data)[1]), ncol=5)
@@ -129,29 +129,88 @@ AUC_eval <- function(gmodel,Data){
 }
 
 glm0 <- glm(purchase~., data=Data,family = "binomial")
-Anova(glm0,type=2,test="LR")
+Anova(glm0,type=2,test="LR") %>% kable(digit=3,caption = "ANOVA Test-II Table for original model") %>% kable_styling()
+
 #cat(AUC_eval(glm0,Data)) # 0.8844597
 #AIC(glm0) # 7171.662
 #BIC(glm0) # 7583.897
 ```
-As seen from the results of the ANOVA II-test on $glm_0$, we observe a few statistically significant covariates (p-value less than $0.1$): `n_product_page`,`exit_rates`,`page_values`,`month`,`traffic_type`,`visitor_type`,`avg_time_product_page`, but one can note that the last two are less significant than the others by several orders of magnitude. From this full model, we get an AUC of $0.884$ which is below the targeted benchmark of $0.895$. For the sake of completeness, we get an AIC of $7172$ and a BIC of $7584$. 
+As seen from the results of the ANOVA II-test on $glm_0$, we observe a few statistically significant covariates (p-value less than $0.1$): `n_product_page`,`exit_rates`,`page_values`,`month`,`traffic_type`,`visitor_type`,`avg_time_product_page`, but one can note that the last two are less significant than the others by several orders of magnitude. From this full model, we get an AUC of $0.884$ which is below the targeted benchmark of $0.895$. For the sake of completeness, we get an AIC of $7172$ and a BIC of $7584$.
 
-```{r, echo=FALSE, message=FALSE}
+The next step is to fit the model containing only the statistically significant covariates, which we will call $glm_{sig}$. With this model, we obtain an AUC of $0.8878$, an AIC of $7145$ and a BIC of $7344$. All those metrics are slightly better than $glm_0$, even though the model-submodel test using the Loglikelihood ratio test has a p-value of $0.35$, as seen on the two tables below.
+
+```{r, echo=FALSE, message=FALSE,warning=FALSE}
 glm_sig <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type + avg_time_product_page, data=Data,family = "binomial")
-#Anova(glm_sig,type=2,test="LR") # everything is significant (as expected)
-cat(AUC_eval(glm_sig,Data)) # 0.8878329
-AIC(glm_sig) # 7145.045
-BIC(glm_sig) # 7343.802
+Anova(glm_sig,type=2,test="LR") %>% kable(digit=3,caption = "ANOVA Test-II Table for $glm_{sig}$") %>% kable_styling()
 
-anova(glm0,glm_sig,test="LRT")
+# everything is significant (as expected)
+#AUC_eval(glm_sig,Data)) # 0.8878329
+#AIC(glm_sig) # 7145.045
+#BIC(glm_sig) # 7343.802
+anova(glm0,glm_sig,test="LRT") %>% kable(digit=3,caption = "Model-submodel test between $glm_0$ and $glm_{sig}$") %>% kable_styling()
 ```
-The next step is to fit the model containing only the statistically significant covariates, which we will call $glm_{sig}$. With this model, we obtain an AUC of $0.8878$, an AIC of $7145$ and a BIC of $7344$. All those metrics are slightly better than $glm_0$, even though the model-submodel test using the Loglikelihood ratio test has a p-value of $0.35$.
+
 ## Deeper look at the residuals
+
 Now that we have a basic logistic regression model $glm_{sig}$, one can plot the residuals vs the covariates and assess whether there are non-linear relations which might have been missed and could contribute to better target prediction.
 
+```{r, echo=FALSE,message=FALSE,fig.height=6,fig.width=12,fig.align='center',warning=FALSE}
+Data %>% mutate_if(is.factor,as.numeric) %>%
+  mutate(res=resid(glm_sig)) %>%
+  pivot_longer(-res) %>% ggplot(aes(y=res,x=value)) + 
+  labs(title = "Residuals vs Covariate plot", caption="Fig 3 : Residuals points and smoothing function wrt. covariate values",
+       y = "Residuals", x = "Covariate value")+ theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=10,face="bold"),title= element_text(size=15,face="bold"),
+        plot.caption = element_text(size=12))+ 
+  facet_wrap(~ name, scales = "free") + geom_point() + geom_smooth()
+
+```
+
+A few comments can be made on those residual plots. First, the most obvious non-linear relation is the non-linear relation of the residuals with respect to `page_values`. After a few tests, we have seen that a cubic function sucessfully explains the residuals regarding this covariate (the quadratic relation still left non-linearities in the resulting residual plot). Even if it is very subtle, one can observe that the smoothing lines for `n_product_page`,`n_admin_page` and `n_info_page` are slightly non-linear. Hereunder is the Anova type-II test regarding thoe
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type + avg_time_product_page + I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2)+I(n_info_page^2),data=Data,family = "binomial")
+
+Anova(glm_enhanced,type=2,test="LR") %>% kable(digits = 3,caption = "ANOVA Test-II Table for enhanced model") %>% kable_styling()
+```
+With this anova test, one can see that `avg_time_product_page` now became statistically insignificant, with a p-value of 0.165 and will therefore be dropped from the covariates, as well as the quadratic dependance with `n_info_page` which is clearly irrelevant.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2),data=Data,family = "binomial")
+#AUC_eval(glm_enhanced,Data)
+#AUC_eval(glm_enhanced,Data) # 0.9043155
+#AIC(glm_enhanced) # 6514.713
+#BIC(glm_enhanced) # 6735.554
+anova(glm_sig,glm_enhanced,test="LRT") %>% kable(digit=3,caption = "Model-submodel test between $glm_{sig} $and $glm_{en}$") %>% kable_styling()
+```
+With this enhanced model $glm_{en}$, we get an AUC of 0.9043 which is beating the benchmark. Additionnally, it has a AIC of $6515$, a BIC of $6735$ and a p-value of $0$ for the model-submodel test with $glm_{sig}$, which shows a great amelioration from the previous model by adding non-linearities.
 
 ## Adding interactions
 
+One can now think about interactions between covariates. For example, one can check the interaction between the visitor's type and whether the session is on the week-end or not.
+```{r}
+kable(table(Data$weekend, Data$visitor_type))%>%kable_styling()
+```
+
+Checking visitors on the week-end vs during the work week gives us different percentages, might be interesting as interaction and finding new clusters of customers. By adding this interaction to the current model, we get 
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+glm_enhanced_vis_wk <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2) + visitor_type:weekend,data=Data,family = "binomial")
+anova(glm_enhanced,glm_enhanced_vis_wk,test="LRT")
+
+AUC_eval(glm_enhanced_vis_wk,Data)
+
+#AIC(glm_enhanced_vis_wk) # 6511.006
+#BIC(glm_enhanced_vis_wk) # 6753.93
+```
+Even though, this is statistically relevant to some extend, it only adds $10^{-4}$ to the AUC metric, and a worse BIC as we are adding more covariates, hence complexifying the model. For simplicity sake, we decided to not pursue any interaction ideas in this model, as the goal of beating the benchmark has already been achieved.
+
 ## Discussion about the model
 
+```{r}
+plot(glm_enhanced)
+```
+
 # Conclusion
+
+To conclude, we created a logistic regression model predicting whether a customer would buy a product on an e-commerce website, attaining an AUC of $0.9043$. Thanks to its architecture, this model can be easily interpretable. No interactions have been added for simplicity sake.
