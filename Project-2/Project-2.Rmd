@@ -18,9 +18,9 @@ load("2_online_shopping.RData")
 
 # Introduction
 
-During the last few decades, the usage of the internet has been tremendously important for businesses around the world, and the word e-commerce became the norm when talking about shopping. Today, and especially for younger people, the first reflex to buy anything would be to check online and buy their products from their preferred brands' websites. Those companies who sell products online therefore gather lots of data about their customers and can use it to predict customers' behavior and purchase habits to increase their total sales. This may be done by understanding which features are the most important to predict customers' purchases. In this project, we present a way to predict a purchase of a given customer given his activity on the website. This is done by using a logistic regression model which suits the prediction of categorical data (purchase or not) quite well when compared to other types de models such as linear regression.
+During the last few decades, the usage of the internet has been tremendously important for businesses around the world. Today, and especially for younger people, the first reflex to buy anything would be to search online and buy their products from their preferred brands' websites. Those companies which sell products online therefore gather lots of data about their customers and can use it to predict their behavior and purchase habits to increase total sales. This may be done by understanding which features are the most important to predict customers' purchases. In this project, we present a way to predict customers' purchases form their activity on the website. This is done by using a logistic regression model which suits the prediction of categorical data (purchase or not) quite well when compared to other types de models such as linear regression.
 
-In this project, we first start by exploring the given dataset, by describing its columns and by wrangling it to get better features for the prediction task. Then, we start looking at the logistic regression model creation thanks to statistical tests such as [ANOVA](https://en.wikipedia.org/wiki/Analysis_of_variance) and their performance thanks to [AIC](https://en.wikipedia.org/wiki/Akaike_information_criterion), [BIC](https://en.wikipedia.org/wiki/Bayesian_information_criterion) and [AUC](https://en.wikipedia.org/wiki/Receiver_operating_characteristic). We then plot some results about the final model regarding various metrics of interest and lastly conclude on the results we obtain and further steps.
+In this project, we first start by exploring the given dataset, by describing its columns and by wrangling it to get better features for the prediction task. Then, we start looking at the logistic regression model creation and benchmark their performances with statistical tests such as [ANOVA](https://en.wikipedia.org/wiki/Analysis_of_variance) and other metrics like [AIC](https://en.wikipedia.org/wiki/Akaike_information_criterion), [BIC](https://en.wikipedia.org/wiki/Bayesian_information_criterion) and [AUC](https://en.wikipedia.org/wiki/Receiver_operating_characteristic). Lastly, we conclude on the obtained model and its metrics and further steps.
 
 # Data exploration
 
@@ -28,7 +28,7 @@ In this project, we first start by exploring the given dataset, by describing it
 
 The studied [dataset](https://archive.ics.uci.edu/ml/datasets/Online+Shoppers+Purchasing+Intention+Dataset) contains a list of customers' session on a given website with several features described below. Each of the 11630 rows represents one customer's session, ending with a purchase or not. Each session belongs to a different user in a 1-year period to avoid any tendency to a specific campaign, special day, user profile, or period.
 
-Description of the dataset columns following by its - `relabelling` for clarity purposes:
+Description of the dataset columns following by its `relabelling` for clarity purposes:
 
 * `Administrative` : number of administrative-type pages that the user visited - `n_admin_page`
 * `Administrative_Duration` : time spent on administrative pages - `time_admin_page`
@@ -135,7 +135,7 @@ Anova(glm0,type=2,test="LR") %>% kable(digit=3,caption = "ANOVA Test-II Table fo
 #AIC(glm0) # 7171.662
 #BIC(glm0) # 7583.897
 ```
-As seen from the results of the ANOVA II-test on $glm_0$, we observe a few statistically significant covariates (p-value less than $0.1$): `n_product_page`,`exit_rates`,`page_values`,`month`,`traffic_type`,`visitor_type`,`avg_time_product_page`, but one can note that the last two are less significant than the others by several orders of magnitude. From this full model, we get an AUC of $0.884$ which is below the targeted benchmark of $0.895$. For the sake of completeness, we get an AIC of $7172$ and a BIC of $7584$.
+As seen from the results of the ANOVA II-test on $glm_0$, we observe a few statistically significant covariates (p-value less than $0.1$): `n_product_page`,`exit_rates`,`page_values`,`month`,`traffic_type`,`visitor_type`,`avg_time_product_page`. From this full model, we get an AUC of $0.884$ which is below the targeted benchmark of $0.895$. For the sake of completeness, we get an AIC of $7172$ and a BIC of $7584$.
 
 The next step is to fit the model containing only the statistically significant covariates, which we will call $glm_{sig}$. With this model, we obtain an AUC of $0.8878$, an AIC of $7145$ and a BIC of $7344$. All those metrics are slightly better than $glm_0$, even though the model-submodel test using the Loglikelihood ratio test has a p-value of $0.35$, as seen on the two tables below.
 
@@ -166,51 +166,64 @@ Data %>% mutate_if(is.factor,as.numeric) %>%
 
 ```
 
-A few comments can be made on those residual plots. First, the most obvious non-linear relation is the non-linear relation of the residuals with respect to `page_values`. After a few tests, we have seen that a cubic function sucessfully explains the residuals regarding this covariate (the quadratic relation still left non-linearities in the resulting residual plot). Even if it is very subtle, one can observe that the smoothing lines for `n_product_page`,`n_admin_page` and `n_info_page` are slightly non-linear. Hereunder is the Anova type-II test regarding thoe
+A few comments can be made on those residual plots. First, the most obvious non-linear relation is the non-linear relation of the residuals with respect to `page_values`. After a few tests, we have seen that a cubic function sucessfully explains the residuals regarding this covariate (the quadratic relation still left non-linearities in the resulting residual plot). Even if it is very subtle, one can observe that the smoothing lines for `avg_time_product_page`,`n_product_page`,`n_admin_page` and `n_info_page` are slightly non-linear. Hereunder is the Anova type-II test regarding those.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
-glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type + avg_time_product_page + I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2)+I(n_info_page^2),data=Data,family = "binomial")
-
+glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type + avg_time_product_page + I(page_values^2) + I(page_values^3) + I(avg_time_product_page^2) + I(n_product_page^2)+I(n_admin_page^2)+I(n_info_page^2),data=Data,family = "binomial")
+#Anova(glm_enhanced,type=2,test="LR")
 Anova(glm_enhanced,type=2,test="LR") %>% kable(digits = 3,caption = "ANOVA Test-II Table for enhanced model") %>% kable_styling()
 ```
-With this anova test, one can see that `avg_time_product_page` now became statistically insignificant, with a p-value of 0.165 and will therefore be dropped from the covariates, as well as the quadratic dependance with `n_info_page` which is clearly irrelevant.
+With this anova test, one can see that the quadratic dependence on product- and admin-related pages are significant, while the one with respect to the average of time-product per page and the information-related page are not, with respectively a p-value of $0.16$ and $0.9$, those will therefore be discarded. Additionally, one can note that the average time per product page is the least significant from the remaining covariates, and by checking the AUC,AIC and BIC from the model with and without this covariate, one obtains better results when dropping it, which we will do.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
 glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2),data=Data,family = "binomial")
-#AUC_eval(glm_enhanced,Data)
 #AUC_eval(glm_enhanced,Data) # 0.9043155
 #AIC(glm_enhanced) # 6514.713
 #BIC(glm_enhanced) # 6735.554
 anova(glm_sig,glm_enhanced,test="LRT") %>% kable(digit=3,caption = "Model-submodel test between $glm_{sig} $and $glm_{en}$") %>% kable_styling()
 ```
-With this enhanced model $glm_{en}$, we get an AUC of 0.9043 which is beating the benchmark. Additionnally, it has a AIC of $6515$, a BIC of $6735$ and a p-value of $0$ for the model-submodel test with $glm_{sig}$, which shows a great amelioration from the previous model by adding non-linearities.
+With this enhanced model $glm_{en}$, we get an AUC of 0.9043 which is beating the benchmark. Additionally, it has a AIC of $6515$, a BIC of $6735$ and a p-value of $0$ for the model-submodel test with $glm_{sig}$, which shows a great amelioration from the previous model by adding nonlinearities.
 
 ## Adding interactions
 
-One can now think about interactions between covariates. For example, one can check the interaction between the visitor's type and whether the session is on the week-end or not.
-```{r}
-kable(table(Data$weekend, Data$visitor_type))%>%kable_styling()
-```
+One can now think about interactions between covariates to find subtle relations from covariates. In this project, we focused on interactions between continuous and categorical variables.
 
-Checking visitors on the week-end vs during the work week gives us different percentages, might be interesting as interaction and finding new clusters of customers. By adding this interaction to the current model, we get 
+First, we started with the interaction between the week-end boolean and the other covariates in the model. By running an ANOVA type II test, we get that the interaction with `n_product_page`,`page_values` and `visitor_type` are statistically significant.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
-glm_enhanced_vis_wk <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2) + visitor_type:weekend,data=Data,family = "binomial")
-anova(glm_enhanced,glm_enhanced_vis_wk,test="LRT")
-
-AUC_eval(glm_enhanced_vis_wk,Data)
-
-#AIC(glm_enhanced_vis_wk) # 6511.006
-#BIC(glm_enhanced_vis_wk) # 6753.93
+glm_enhanced_wk <- glm(purchase ~ (n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2))*weekend,data=Data,family = "binomial")
+#Anova(glm_enhanced_wk,type=2,test="LR")
 ```
-Even though, this is statistically relevant to some extend, it only adds $10^{-4}$ to the AUC metric, and a worse BIC as we are adding more covariates, hence complexifying the model. For simplicity sake, we decided to not pursue any interaction ideas in this model, as the goal of beating the benchmark has already been achieved.
+By the same reasoning for visitor's type, we noted that the interaction with lots of covariates are statistically relevant, and especially with `page_values` related covariate (linear, quadratic and cubic). The interactions between the month and visitor type are also worth to be noted.
 
-## Discussion about the model
-
-```{r}
-plot(glm_enhanced)
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+glm_enhanced_vt <- glm(purchase ~ (n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2))*visitor_type,data=Data,family = "binomial")
+#Anova(glm_enhanced_vt,type=2,test="LR")
 ```
+However, when adding all those interactions, and running an ANOVA test as well as computing the AUC, we obtained poor results (AUC of $0.81$ and non-significance), which shows the limitations of such tests. For the final model, we chose to only keep the interactions `page_values:weekend` and `page_values:visitor_type`, as those gave better AUC results overall. All the covariates used for the final model and their respective p-value are listed below, as well as the result of the model-submodel test between $glm_{en}$ and $glm_{final}$ with p-value approx. equal to $0$. Regarding the metrics, we obtain $0.905$ for AUC, $6480$ for AIC and $6723$.
 
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+glm_final <- glm(purchase ~ n_product_page + exit_rates + page_values + month 
+                            + traffic_type + visitor_type+ I(page_values^2) + 
+                            I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2)
+                            +page_values:weekend+page_values:visitor_type,
+                            data=Data,family = "binomial")
+
+#Anova(glm_final,type=2,test="LR")
+
+anova(glm_enhanced,glm_final,test="LRT") %>% kable(digit=3,caption = "Model-submodel test between $glm_{en}$ and $glm_{final}$") %>% kable_styling()
+
+#AUC_eval(glm_final,Data) # 0.9050036
+#AIC(glm_final) # 6479.966
+#BIC(glm_final) # 6722.89
+```
 # Conclusion
 
-To conclude, we created a logistic regression model predicting whether a customer would buy a product on an e-commerce website, attaining an AUC of $0.9043$. Thanks to its architecture, this model can be easily interpretable. No interactions have been added for simplicity sake.
+To conclude, we created a logistic regression model predicting whether a customer would buy a product on an e-commerce website, attaining an AUC of $0.905$. The covariates are a combination of metrics coming from the website itself (`n_product_page`,`n_admin_page`), from the date of the session (`month`,`weekend`) and from Google Analytics (`traffic_type`,`visitor_type`,`page_values`,`exit_rates`), and non-linear transformations of certain variables. This project was heaviliy based on ANOVA testing and statistical significance to find relevant covariates, and is therefore highly depending on the type of test which was done (likelihood ratio test in this case), as well as the significance level chosen throughout the covariate selection. Finally, we added interactions in order to find more subtle relations between covariates, which resulted in an overall increase of the model's score. The next steps would be to compare this model with other types of prediction models (random forests, neural networks,...) and check its performance.
+
+# Bonus scientific contribution
+
+```{r, echo=FALSE,message=FALSE,fig.show="hold", out.width="50%",fig.align='center',warning=FALSE}
+include_graphics("plots/statistical_sig.jpg")
+```
