@@ -68,10 +68,16 @@ Data <- Data %>% mutate(os=as.factor(os), browser=as.factor(browser),
                         purchase=as.factor(purchase),month=as.factor(month),
                         visitor_type=as.factor(visitor_type))
 
-Data %>% mutate_if(is.factor,as.numeric) %>% pivot_longer(everything()) %>% ggplot(aes(value)) + geom_histogram(aes(y=..density..)) + labs(title = "Distribution of features", caption="Fig 1 : Distribution of each feature of the dataset",
-       y = "Distribution", x = "feature value") + theme(axis.text=element_text(size=13),
-        axis.title=element_text(size=15,face="bold"),title= element_text(size=20,face="bold"),
-        plot.caption = element_text(size=15)) + facet_wrap(~ name, scales = "free")
+Data %>% mutate_if(is.factor,as.numeric) %>% pivot_longer(everything()) %>% 
+  ggplot(aes(value)) + geom_histogram(aes(y=..density..)) + 
+  labs(title = "Distribution of features", 
+       caption="Fig 1 : Distribution of each feature of the dataset",
+       y = "Distribution", x = "feature value") + 
+       theme(axis.text=element_text(size=13),
+             axis.title=element_text(size=15,face="bold"),
+             title= element_text(size=20,face="bold"),
+       plot.caption = element_text(size=15)) +
+       facet_wrap(~ name, scales = "free")
 
 # Merging the factored data
 for (i in factors){
@@ -87,20 +93,25 @@ As seen in Fig. $1$, the time spent on a given type of page, i.e. product, admin
 ```{r, echo=FALSE,message=FALSE,fig.align='center',fig.height=4,fig.width=8,warning=FALSE}
 quotient_prod <- rep(0, nrow(Data)) # initialize the quotient vector
 zero_denom_prod <- which(Data[, "n_product_page"] == 0) # find indices where denominator is 0
-quotient_prod[-zero_denom_prod] <- Data[, "time_product_page"][-zero_denom_prod] / Data[, "n_product_page"][-zero_denom_prod]
+quotient_prod[-zero_denom_prod] <- Data[, "time_product_page"][-zero_denom_prod]/Data[, "n_product_page"][-zero_denom_prod]
 
 quotient_info <- rep(0, nrow(Data)) # initialize the quotient vector
 zero_denom_info <- which(Data[, "n_info_page"] == 0) # find indices where denominator is 0
-quotient_info[-zero_denom_info] <- Data[, "time_info_page"][-zero_denom_info] / Data[, "n_info_page"][-zero_denom_info]
+quotient_info[-zero_denom_info] <- Data[, "time_info_page"][-zero_denom_info]/Data[, "n_info_page"][-zero_denom_info]
 
 quotient_admin <- rep(0, nrow(Data)) # initialize the quotient vector
 zero_denom_admin <- which(Data[, "n_admin_page"] == 0) # find indices where denominator is 0
-quotient_admin[-zero_denom_admin] <- Data[, "time_admin_page"][-zero_denom_admin] / Data[, "n_admin_page"][-zero_denom_admin]
+quotient_admin[-zero_denom_admin] <- Data[, "time_admin_page"][-zero_denom_admin]/Data[, "n_admin_page"][-zero_denom_admin]
 
-Data <- Data %>% select(-time_product_page,-time_admin_page,-time_info_page) %>% mutate(avg_time_product_page = quotient_prod,avg_time_admin_page = quotient_admin,avg_time_info_page = quotient_info)
+Data <- Data %>% select(-time_product_page,-time_admin_page,-time_info_page) %>% 
+  mutate(avg_time_product_page = quotient_prod,avg_time_admin_page = quotient_admin,avg_time_info_page = quotient_info)
 
- Data %>% select(avg_time_product_page,avg_time_admin_page,avg_time_info_page) %>% pivot_longer(everything()) %>% ggplot(aes(value)) + geom_histogram(aes(y = ..density..)) + labs(title = "Distribution of avg. time features", caption="Fig 2 : Distribution of time features of the dataset",
-       y = "Distribution", x = "feature value") + theme(axis.text=element_text(size=12),
+ Data %>% select(avg_time_product_page,avg_time_admin_page,avg_time_info_page) %>% 
+   pivot_longer(everything()) %>% ggplot(aes(value)) + 
+   geom_histogram(aes(y = ..density..)) + 
+   labs(title = "Distribution of avg. time features", 
+        caption="Fig 2 : Distribution of time features of the dataset",
+        y = "Distribution", x = "feature value") + theme(axis.text=element_text(size=12),
         axis.title=element_text(size=10,face="bold"),title= element_text(size=15,face="bold"),
         plot.caption = element_text(size=12)) + facet_wrap(~ name, scales = "free")
 ```
@@ -129,7 +140,9 @@ AUC_eval <- function(gmodel,Data){
 }
 
 glm0 <- glm(purchase~., data=Data,family = "binomial")
-Anova(glm0,type=2,test="LR") %>% kable(digit=3,caption = "ANOVA Test-II Table for original model") %>% kable_styling()
+Anova(glm0,type=2,test="LR") %>% 
+  kable(digit=3,caption = "ANOVA Test-II Table for original model") %>% 
+  kable_styling()
 
 #cat(AUC_eval(glm0,Data)) # 0.8844597
 #AIC(glm0) # 7171.662
@@ -158,9 +171,12 @@ Now that we have a basic logistic regression model $glm_{sig}$, one can plot the
 Data %>% mutate_if(is.factor,as.numeric) %>%
   mutate(res=resid(glm_sig)) %>%
   pivot_longer(-res) %>% ggplot(aes(y=res,x=value)) + 
-  labs(title = "Residuals vs Covariate plot", caption="Fig 3 : Residuals points and smoothing function wrt. covariate values",
-       y = "Residuals", x = "Covariate value")+ theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=10,face="bold"),title= element_text(size=15,face="bold"),
+  labs(title = "Residuals vs Covariate plot", 
+       caption="Fig 3 : Residuals points and smoothing function wrt. covariate values",
+       y = "Residuals", x = "Covariate value")+ 
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=10,face="bold"),
+        title= element_text(size=15,face="bold"),
         plot.caption = element_text(size=12))+ 
   facet_wrap(~ name, scales = "free") + geom_point() + geom_smooth()
 
@@ -169,18 +185,29 @@ Data %>% mutate_if(is.factor,as.numeric) %>%
 A few comments can be made on those residual plots. First, the most obvious non-linear relation is the non-linear relation of the residuals with respect to `page_values`. After a few tests, we have seen that a cubic function sucessfully explains the residuals regarding this covariate (the quadratic relation still left non-linearities in the resulting residual plot). Even if it is very subtle, one can observe that the smoothing lines for `avg_time_product_page`,`n_product_page`,`n_admin_page` and `n_info_page` are slightly non-linear. Hereunder is the Anova type-II test regarding those.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
-glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type + avg_time_product_page + I(page_values^2) + I(page_values^3) + I(avg_time_product_page^2) + I(n_product_page^2)+I(n_admin_page^2)+I(n_info_page^2),data=Data,family = "binomial")
+glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month
+                    + traffic_type + visitor_type + avg_time_product_page + 
+                      I(page_values^2) + I(page_values^3) + I(avg_time_product_page^2)+ 
+                      I(n_product_page^2)+I(n_admin_page^2)+I(n_info_page^2),
+                    data=Data,family = "binomial")
 #Anova(glm_enhanced,type=2,test="LR")
-Anova(glm_enhanced,type=2,test="LR") %>% kable(digits = 3,caption = "ANOVA Test-II Table for enhanced model") %>% kable_styling()
+Anova(glm_enhanced,type=2,test="LR") %>% 
+  kable(digits = 3,caption = "ANOVA Test-II Table for enhanced model") %>% 
+  kable_styling()
 ```
 With this anova test, one can see that the quadratic dependence on product- and admin-related pages are significant, while the one with respect to the average of time-product per page and the information-related page are not, with respectively a p-value of $0.16$ and $0.9$, those will therefore be discarded. Additionally, one can note that the average time per product page is the least significant from the remaining covariates, and by checking the AUC,AIC and BIC from the model with and without this covariate, one obtains better results when dropping it, which we will do.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
-glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2),data=Data,family = "binomial")
+glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month
+                    + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3)+
+                      I(n_product_page^2)+I(n_admin_page^2),
+                    data=Data,family = "binomial")
 #AUC_eval(glm_enhanced,Data) # 0.9043155
 #AIC(glm_enhanced) # 6514.713
 #BIC(glm_enhanced) # 6735.554
-anova(glm_sig,glm_enhanced,test="LRT") %>% kable(digit=3,caption = "Model-submodel test between $glm_{sig} $and $glm_{en}$") %>% kable_styling()
+anova(glm_sig,glm_enhanced,test="LRT") %>% 
+  kable(digit=3,caption = "Model-submodel test between $glm_{sig} $and $glm_{en}$") %>% 
+  kable_styling()
 ```
 With this enhanced model $glm_{en}$, we get an AUC of 0.9043 which is beating the benchmark. Additionally, it has a AIC of $6515$, a BIC of $6735$ and a p-value of $0$ for the model-submodel test with $glm_{sig}$, which shows a great amelioration from the previous model by adding nonlinearities.
 
@@ -191,13 +218,21 @@ One can now think about interactions between covariates to find subtle relations
 First, we started with the interaction between the week-end boolean and the other covariates in the model. By running an ANOVA type II test, we get that the interaction with `n_product_page`,`page_values` and `visitor_type` are statistically significant.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
-glm_enhanced_wk <- glm(purchase ~ (n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2))*weekend,data=Data,family = "binomial")
+glm_enhanced_wk <- glm(purchase ~ (n_product_page + exit_rates + page_values + month + 
+                                     traffic_type + visitor_type+ I(page_values^2) + 
+                                     I(page_values^3) + I(n_product_page^2)+
+                                     I(n_admin_page^2))*weekend,
+                       data=Data,family = "binomial")
 #Anova(glm_enhanced_wk,type=2,test="LR")
 ```
 By the same reasoning for visitor's type, we noted that the interaction with lots of covariates are statistically relevant, and especially with `page_values` related covariate (linear, quadratic and cubic). The interactions between the month and visitor type are also worth to be noted.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
-glm_enhanced_vt <- glm(purchase ~ (n_product_page + exit_rates + page_values + month + traffic_type + visitor_type+ I(page_values^2) + I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2))*visitor_type,data=Data,family = "binomial")
+glm_enhanced_vt <- glm(purchase ~ (n_product_page + exit_rates + page_values + month + 
+                                     traffic_type + visitor_type+ I(page_values^2) +
+                                     I(page_values^3) + I(n_product_page^2)+
+                                     I(n_admin_page^2))*visitor_type,
+                       data=Data,family = "binomial")
 #Anova(glm_enhanced_vt,type=2,test="LR")
 ```
 However, when adding all those interactions, and running an ANOVA test as well as computing the AUC, we obtained poor results (AUC of $0.81$ and non-significance), which shows the limitations of such tests. For the final model, we chose to only keep the interactions `page_values:weekend` and `page_values:visitor_type`, as those gave better AUC results overall. All the covariates used for the final model and their respective p-value are listed below, as well as the result of the model-submodel test between $glm_{en}$ and $glm_{final}$ with p-value approx. equal to $0$. Regarding the metrics, we obtain $0.905$ for AUC, $6480$ for AIC and $6723$.
@@ -212,7 +247,9 @@ glm_final <- glm(purchase ~ n_product_page + exit_rates + page_values + month
 
 #Anova(glm_final,type=2,test="LR")
 
-anova(glm_enhanced,glm_final,test="LRT") %>% kable(digit=3,caption = "Model-submodel test between $glm_{en}$ and $glm_{final}$") %>% kable_styling()
+anova(glm_enhanced,glm_final,test="LRT") %>% 
+  kable(digit=3,caption = "Model-submodel test between $glm_{en}$ and $glm_{final}$") %>% 
+  kable_styling()
 
 #AUC_eval(glm_final,Data) # 0.9050036
 #AIC(glm_final) # 6479.966
