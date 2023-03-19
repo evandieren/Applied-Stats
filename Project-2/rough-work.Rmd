@@ -18,7 +18,7 @@ load("2_online_shopping.RData")
 
 ## Renaming and factoring data thanks to histogram
 
-```{r, echo=FALSE, message=FALSE}
+```{r, echo=FALSE, message=FALSE,warning=FALSE}
 names(Data) <- c("n_admin_page","time_admin_page","n_info_page",
                  "time_info_page","n_product_page","time_product_page",
                  "bounce_rates","exit_rates","page_values","special_day",
@@ -79,7 +79,7 @@ By having a closer look to the data, we can identify factors such as the
 
 Above, we created two dataset, one factoring and merging low categorical values (ex. browser etc). We also created a numerical dataset for histogram plotting where the visitor_type became 1,2,3 being New_Visitor, Other and Returning_Visitor
 
-```{r}
+```{r,warning=FALSE}
 #par(mfrow=c(2,n_cols/2 + n_cols%%2))
 #for(i in 1:n_cols){
 #  hist(as.numeric(Data[,i]),
@@ -93,14 +93,14 @@ Data_f %>% mutate_if(is.factor,as.numeric) %>% pivot_longer(everything()) %>% gg
 ```
 Comment this original dataset and talk about the merging and factoring certain values from those histograms distributions
 
-```{r}
+```{r,warning=FALSE}
 gm0 <- glm(purchase~., data=Data_f,family = "binomial")
 Anova(gm0,type=2,test="LR")
 cat(AUC_eval(gm0,Data_f))
 ```
 The above test tells us what happens when we are dropping a single predictor from a saturated model. Here we observe that traffic_type, the month, exit_rates, n_product_page (prior, it was time_product_page), page_values and visitor type are statistically significant. Type II -> "Leave one out" meaning that the order does not manner. So we know that those variable with * are important
 
-```{r}
+```{r,warning=FALSE}
 #gm_t <- glm(purchase~.*weekend, data=Data_f,family = "binomial")
 #Anova(gm_t,type=2,test="LR")
 ```
@@ -109,20 +109,20 @@ visitor_type:weekend might be interested, os:weekend also but might not be reall
 
 ## Contingency tables for factor covariate
 
-```{r}
+```{r,warning=FALSE}
 table(Data_f$purchase, Data_f$visitor_type)
 ```
 With those 2-way tables cross classifying the outcome depending on the type of visitor, we observe that there is 25% of buying when new visitors, and 15% for returning visitors, but there is much more volume for the returning visitors than the new visitors. Without doing a formal test, those percentages seem already different.
 
-```{r}
+```{r,warning=FALSE}
 table(Data_f$purchase, Data_f$month)
 ```
 
-```{r}
+```{r,warning=FALSE}
 table(Data_f$purchase, Data_f$month)
 ```
 
-```{r}
+```{r,warning=FALSE}
 only_sig_model <- glm(purchase ~ n_product_page+time_product_page+exit_rates+page_values+month+traffic_type+visitor_type,data=Data_f,family="binomial")
 #week_end <- glm(purchase ~ time_product_page+exit_rates+page_values+month+traffic_type+visitor_type + weekend,data=Data_f,family="binomial")
 
@@ -144,7 +144,7 @@ Data_f %>% mutate_if(is.factor,as.numeric) %>%
 We can see a quadratic relation between page_values and a split there too. Let's create an enhanced model from the residual plots
 
 
-```{r}
+```{r,warning=FALSE}
 enhanced <- glm(purchase ~ n_product_page+time_product_page+exit_rates+page_values+month+traffic_type+visitor_type + I(page_values^2) + I(page_values^3),data=Data_f,family="binomial")
 Anova(enhanced,type=2,test="LR") # checking for relevancy
 #anova(only_sig_model,enhanced,test="LRT") # so really better
@@ -158,7 +158,7 @@ Data_f %>% mutate_if(is.factor,as.numeric) %>%
 ```
 Now, it is time to check for interactions
 
-```{r}
+```{r,warning=FALSE}
 table(Data_f$weekend, Data_f$visitor_type)
 ```
 
@@ -166,7 +166,7 @@ Checking visitors on the week-end vs during the work week gives us different per
 
 
 
-```{r}
+```{r,warning=FALSE}
 
 enhanced_wk_vist <- glm(purchase ~ n_product_page+time_product_page+exit_rates+page_values+month+traffic_type+visitor_type + I(page_values^2) + I(page_values^3) + weekend:visitor_type,data=Data_f,family="binomial")
 
@@ -175,11 +175,6 @@ AUC_eval(enhanced_wk_vist,Data_f)
 AUC_eval(enhanced,Data_f)
 ```
 
-TODO 
-
-* Checker les valeurs des histogrammes et tapper un log si y'a trop de disparités dans les valeurs, afin de prédire des valeurs + proches plutôt que des grands écarts. check for outliers
-* Construct a glm with "binomial" and plot the residuals
-
-Next plot : create a gm and then plot the residuals vs regressors to find non-linear dependencies (+ use anova tests and stuff to check whether those models make sense).
-
+See the final report for the models and final calculations
+`
 
