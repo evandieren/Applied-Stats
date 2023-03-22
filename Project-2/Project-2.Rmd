@@ -13,6 +13,7 @@ library(knitr)
 library(kableExtra)
 library(pROC)
 library(flexmix)
+library(jtools)
 load("2_online_shopping.RData")
 ```
 
@@ -195,7 +196,7 @@ Anova(glm_enhanced,type=2,test="LR") %>%
   kable(digits = 3,caption = "ANOVA Test-II Table for enhanced model") %>% 
   kable_styling()
 ```
-With this anova test, one can see that the quadratic dependence on product- and admin-related pages are significant, while the one with respect to the average of time-product per page and the information-related page are not, with respectively a p-value of $0.16$ and $0.9$, those will therefore be discarded. Additionally, one can note that the average time per product page is the least significant from the remaining covariates, and by checking the AUC,AIC and BIC from the model with and without this covariate, one obtains better results when dropping it, which we will do.
+With this anova test, one can see that the quadratic dependence on product- and admin-related pages are significant, while the one with respect to the average of time-product per page and the information-related page are not, with respectively a p-value of $0.16$ and $0.9$, those will therefore be discarded. Additionally, one can note that the average time per product page is the least significant from the remaining covariates, and by checking the AUC,AIC and BIC from the model with and without this covariate, one obtains better results when dropping it, which we will do. This enhanced new model will be called $glm_{en}$.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
 glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month
@@ -206,7 +207,7 @@ glm_enhanced <- glm(purchase ~ n_product_page + exit_rates + page_values + month
 #AIC(glm_enhanced) # 6514.713
 #BIC(glm_enhanced) # 6735.554
 anova(glm_sig,glm_enhanced,test="LRT") %>% 
-  kable(digit=3,caption = "Model-submodel test between $glm_{sig} $and $glm_{en}$") %>% 
+  kable(digit=3,caption = "Model-submodel test between $glm_{sig}$ and $glm_{en}$") %>% 
   kable_styling()
 ```
 With this enhanced model $glm_{en}$, we get an AUC of 0.9043 which is beating the benchmark. Additionally, it has a AIC of $6515$, a BIC of $6735$ and a p-value of $0$ for the model-submodel test with $glm_{sig}$, which shows a great amelioration from the previous model by adding nonlinearities.
@@ -255,12 +256,27 @@ anova(glm_enhanced,glm_final,test="LRT") %>%
 #AIC(glm_final) # 6479.966
 #BIC(glm_final) # 6722.89
 ```
+
+## Final model description
+
+```r
+glm_final <- glm(purchase ~ n_product_page + exit_rates + page_values + month 
+                            + traffic_type + visitor_type+ I(page_values^2) + 
+                            I(page_values^3) + I(n_product_page^2)+I(n_admin_page^2)
+                            +page_values:weekend+page_values:visitor_type,
+                            data=Data,family = "binomial")
+```
+
+As shown above, we get the final model by adding every aspect of the previously discussed points, such as the significant initial covariates, the non-linear dependences regarding `page_values`, `n_product_page` and `n_admin_page` as well as two interactions. This model was significantly better than the previous iterations as seen above and arrive to a $0.905$ AUC which beats the benchmark.
+
 # Conclusion
 
 To conclude, we created a logistic regression model predicting whether a customer would buy a product on an e-commerce website, attaining an AUC of $0.905$. The covariates are a combination of metrics coming from the website itself (`n_product_page`,`n_admin_page`), from the date of the session (`month`,`weekend`) and from Google Analytics (`traffic_type`,`visitor_type`,`page_values`,`exit_rates`), and non-linear transformations of certain variables. This project was heaviliy based on ANOVA testing and statistical significance to find relevant covariates, and is therefore highly depending on the type of test which was done (likelihood ratio test in this case), as well as the significance level chosen throughout the covariate selection. Finally, we added interactions in order to find more subtle relations between covariates, which resulted in an overall increase of the model's score. The next steps would be to compare this model with other types of prediction models (random forests, neural networks,...) and check its performance.
 
-# Bonus scientific contribution
+# Appendix
 
-```{r, echo=FALSE,message=FALSE,fig.show="hold", out.width="50%",fig.align='center',warning=FALSE}
-include_graphics("plots/statistical_sig.jpg")
+## Full summary of the final model
+
+```{r,echo=FALSE,message=FALSE}
+summ(glm_final,confint = TRUE,digit=3)
 ```
