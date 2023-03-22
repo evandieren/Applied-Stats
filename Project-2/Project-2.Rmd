@@ -2,7 +2,14 @@
 title: "Project 2 - e-commerce purchase prediction"
 author: "Eliott Van Dieren"
 date: "`r Sys.Date()`"
-output: bookdown::html_document2
+output: 
+  html_document:
+    theme: united
+    number_sections: true
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
 ---
 
 ```{r setup, include=FALSE}
