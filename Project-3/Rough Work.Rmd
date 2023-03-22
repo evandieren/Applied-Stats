@@ -1,0 +1,37 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+```{r}
+m_1819 <- read.csv("Premier_League/2018-2019.csv")
+m_1920 <- read.csv("Premier_League/2019-2020.csv")
+m_2021 <- read.csv("Premier_League/2020-2021.csv")
+m_2122 <- read.csv("Premier_League/2021-2022.csv")
+
+kept_variables <- c("Date","HomeTeam","AwayTeam","FTHG","FTAG","FTR")
+
+Data <- rbind(m_1819[,kept_variables],m_1920[,kept_variables],
+              m_2021[,kept_variables],m_2122[,kept_variables])
+
+Data <- Data %>% mutate_if(is.character,as.factor) %>% mutate(Date = as.Date(Date,format="%d/%m/%Y"))
+str(Data)
+
+Data %>%  mutate(covid = case_when(
+                  Date > 06 & hour_admit < 12 ~ "Morning",
+                  hour_admit >= 12 & hour_admit < 17 ~ "Afternoon",
+                  hour_admit >= 17 & hour_admit < 21 ~ "Evening",
+                  hour_admit >=21 | hour_admit <= 6 ~ "Night")
+```
+
+Date = Match Date (dd/mm/yy)
+HomeTeam = Home Team
+AwayTeam = Away Team
+FTHG = Full Time Home Team Goals
+FTAG = Full Time Away Team Goals
+FTR = Full Time Result (H=Home Win, D=Draw, A=Away Win)
