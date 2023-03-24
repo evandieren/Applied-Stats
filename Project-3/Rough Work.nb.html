@@ -1770,20 +1770,25 @@ pre code {
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 <!-- rnb-text-begin -->
+<p>The goal is to know whether the home advantage persist through Covid?
+This can be done by using Poisson regression on an outcome variable
+<span class="math inline">\(Y_{ij}\)</span> which is the number of goals
+of a team <span class="math inline">\(i\)</span> for a given match <span class="math inline">\(m\)</span>.</p>
+<p>One can define the problem as follows : <span class="math inline">\(log(Y) = \alpha + \beta_1 \cdot H + \beta_2 \cdot
+C + \beta_3 \cdot H * C\)</span>, where <span class="math inline">\(Y\)</span> is the number of goal scored, <span class="math inline">\(H\)</span> is a boolean saying whether the team
+plays at home, <span class="math inline">\(C\)</span> is the covid
+indicator, and <span class="math inline">\(H \cdot C\)</span> marks the
+interaction between being at Home and playing during Covid.</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3RyKERhdGEpXG5cbmBgYCJ9 -->
-<pre class="r"><code>str(Data)
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudGFibGUoRGF0YSRIb21lKVxuXG5gYGAifQ== -->
+<pre class="r"><code>table(Data$Home)
 </code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiJ2RhdGEuZnJhbWUnOlx0MTQwMCBvYnMuIG9mICA2IHZhcmlhYmxlczpcbiAkIERhdGUgICAgOiBEYXRlLCBmb3JtYXQ6IFwiMjAxOC0wOC0xMFwiIFwiMjAxOC0wOC0xMVwiIFwiMjAxOC0wOC0xMVwiIFwiMjAxOC0wOC0xMVwiIC4uLlxuICQgSG9tZVRlYW06IEZhY3RvciB3LyAyNiBsZXZlbHMgXCJBcnNlbmFsXCIsXCJBc3RvbiBWaWxsYVwiLC4uOiAxNyAzIDExIDEyIDE4IDIzIDI2IDEgMTUgMjEgLi4uXG4gJCBBd2F5VGVhbTogRmFjdG9yIHcvIDI2IGxldmVscyBcIkFyc2VuYWxcIixcIkFzdG9uIFZpbGxhXCIsLi46IDE0IDcgOSA4IDIyIDUgMTAgMTYgMjUgNiAuLi5cbiAkIEZUSEcgICAgOiBpbnQgIDIgMiAwIDAgMSAyIDIgMCA0IDAgLi4uXG4gJCBGVEFHICAgIDogaW50ICAxIDAgMiAzIDIgMCAyIDIgMCAwIC4uLlxuICQgRlRSICAgICA6IEZhY3RvciB3LyAzIGxldmVscyBcIkFcIixcIkRcIixcIkhcIjogMyAzIDEgMSAxIDMgMiAxIDMgMiAuLi5cbiJ9 -->
-<pre><code>&#39;data.frame&#39;:   1400 obs. of  6 variables:
- $ Date    : Date, format: &quot;2018-08-10&quot; &quot;2018-08-11&quot; &quot;2018-08-11&quot; &quot;2018-08-11&quot; ...
- $ HomeTeam: Factor w/ 26 levels &quot;Arsenal&quot;,&quot;Aston Villa&quot;,..: 17 3 11 12 18 23 26 1 15 21 ...
- $ AwayTeam: Factor w/ 26 levels &quot;Arsenal&quot;,&quot;Aston Villa&quot;,..: 14 7 9 8 22 5 10 16 25 6 ...
- $ FTHG    : int  2 2 0 0 1 2 2 0 4 0 ...
- $ FTAG    : int  1 0 2 3 2 0 2 2 0 0 ...
- $ FTR     : Factor w/ 3 levels &quot;A&quot;,&quot;D&quot;,&quot;H&quot;: 3 3 1 1 1 3 2 1 3 2 ...</code></pre>
+<!-- rnb-output-begin eyJkYXRhIjoiXG5GQUxTRSAgVFJVRSBcbiAxNDAwICAxNDAwIFxuIn0= -->
+<pre><code>
+FALSE  TRUE 
+ 1400  1400 </code></pre>
 <!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
@@ -1791,8 +1796,41 @@ pre code {
 Team FTHG = Full Time Home Team Goals FTAG = Full Time Away Team Goals
 FTR = Full Time Result (H=Home Win, D=Draw, A=Away Win)</p>
 <!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3VtbWFyeShnbTIpXG5cbmBgYCJ9 -->
+<pre class="r"><code>summary(gm2)
+</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiXG5DYWxsOlxuZ2xtKGZvcm11bGEgPSBHb2FscyB+IENvdmlkICogSG9tZSwgZmFtaWx5ID0gcG9pc3NvbihsaW5rID0gXCJsb2dcIiksIFxuICAgIGRhdGEgPSBEYXRhKVxuXG5EZXZpYW5jZSBSZXNpZHVhbHM6IFxuICAgIE1pbiAgICAgICAxUSAgIE1lZGlhbiAgICAgICAzUSAgICAgIE1heCAgXG4tMS43MjYyICAtMC40MjcxICAtMC40MjcxICAgMC4zOTY5ICAgNC4xNjU2ICBcblxuQ29lZmZpY2llbnRzOlxuICAgICAgICAgICAgICAgICAgICAgRXN0aW1hdGUgU3RkLiBFcnJvciB6IHZhbHVlIFByKD58enwpICAgIFxuKEludGVyY2VwdCkgICAgICAgICAzLjI3MmUtMDEgIDYuODIwZS0wMiAgIDQuNzk4ICAxLjZlLTA2ICoqKlxuQ292aWRUUlVFICAgICAgICAgICA3LjE1NGUtMDIgIDcuMjA0ZS0wMiAgIDAuOTkzICAgIDAuMzIxICAgIFxuSG9tZVRSVUUgICAgICAgICAgIC0xLjAxNWUtMTQgIDkuNjQ1ZS0wMiAgIDAuMDAwICAgIDEuMDAwICAgIFxuQ292aWRUUlVFOkhvbWVUUlVFICAxLjEyMmUtMTQgIDEuMDE5ZS0wMSAgIDAuMDAwICAgIDEuMDAwICAgIFxuLS0tXG5TaWduaWYuIGNvZGVzOiAgMCDigJgqKirigJkgMC4wMDEg4oCYKirigJkgMC4wMSDigJgq4oCZIDAuMDUg4oCYLuKAmSAwLjEg4oCYIOKAmSAxXG5cbihEaXNwZXJzaW9uIHBhcmFtZXRlciBmb3IgcG9pc3NvbiBmYW1pbHkgdGFrZW4gdG8gYmUgMSlcblxuICAgIE51bGwgZGV2aWFuY2U6IDM1NTcuMSAgb24gMjc5OSAgZGVncmVlcyBvZiBmcmVlZG9tXG5SZXNpZHVhbCBkZXZpYW5jZTogMzU1NS4xICBvbiAyNzk2ICBkZWdyZWVzIG9mIGZyZWVkb21cbkFJQzogODc4OC44XG5cbk51bWJlciBvZiBGaXNoZXIgU2NvcmluZyBpdGVyYXRpb25zOiA1XG4ifQ== -->
+<pre><code>
+Call:
+glm(formula = Goals ~ Covid * Home, family = poisson(link = &quot;log&quot;), 
+    data = Data)
 
-<div id="rmd-source-code">LS0tCnRpdGxlOiAiUiBOb3RlYm9vayIKb3V0cHV0OiBodG1sX25vdGVib29rCi0tLQoKYGBge3Igc2V0dXAsIGluY2x1ZGU9RkFMU0V9CmtuaXRyOjpvcHRzX2NodW5rJHNldChlY2hvID0gVFJVRSkKbGlicmFyeSh0aWR5dmVyc2UpCmBgYAoKYGBge3J9Cm1fMTgxOSA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAxOC0yMDE5LmNzdiIpCm1fMTkyMCA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAxOS0yMDIwLmNzdiIpCm1fMjAyMSA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAyMC0yMDIxLmNzdiIpCm1fMjEyMiA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAyMS0yMDIyLmNzdiIpCgprZXB0X3ZhcmlhYmxlcyA8LSBjKCJEYXRlIiwiSG9tZVRlYW0iLCJBd2F5VGVhbSIsIkZUSEciLCJGVEFHIiwiRlRSIikKCkRhdGEgPC0gcmJpbmQobV8xODE5WyxrZXB0X3ZhcmlhYmxlc10sbV8xOTIwWyxrZXB0X3ZhcmlhYmxlc10sCiAgICAgICAgICAgICAgbV8yMDIxWyxrZXB0X3ZhcmlhYmxlc10sbV8yMTIyWyxrZXB0X3ZhcmlhYmxlc10pCgpEYXRhIDwtIERhdGEgJT4lIG11dGF0ZV9pZihpcy5jaGFyYWN0ZXIsYXMuZmFjdG9yKSAlPiUgbXV0YXRlKERhdGUgPSBhcy5EYXRlKERhdGUsZm9ybWF0PSIlZC8lbS8lWSIpKQpzdHIoRGF0YSkKCkRhdGEgJT4lICBtdXRhdGUoY292aWQgPSBjYXNlX3doZW4oCiAgICAgICAgICAgICAgICAgIERhdGUgPiAwNiAmIGhvdXJfYWRtaXQgPCAxMiB+ICJNb3JuaW5nIiwKICAgICAgICAgICAgICAgICAgaG91cl9hZG1pdCA+PSAxMiAmIGhvdXJfYWRtaXQgPCAxNyB+ICJBZnRlcm5vb24iLAogICAgICAgICAgICAgICAgICBob3VyX2FkbWl0ID49IDE3ICYgaG91cl9hZG1pdCA8IDIxIH4gIkV2ZW5pbmciLAogICAgICAgICAgICAgICAgICBob3VyX2FkbWl0ID49MjEgfCBob3VyX2FkbWl0IDw9IDYgfiAiTmlnaHQiKQpgYGAKCkRhdGUgPSBNYXRjaCBEYXRlIChkZC9tbS95eSkKSG9tZVRlYW0gPSBIb21lIFRlYW0KQXdheVRlYW0gPSBBd2F5IFRlYW0KRlRIRyA9IEZ1bGwgVGltZSBIb21lIFRlYW0gR29hbHMKRlRBRyA9IEZ1bGwgVGltZSBBd2F5IFRlYW0gR29hbHMKRlRSID0gRnVsbCBUaW1lIFJlc3VsdCAoSD1Ib21lIFdpbiwgRD1EcmF3LCBBPUF3YXkgV2luKQ==</div>
+Deviance Residuals: 
+    Min       1Q   Median       3Q      Max  
+-1.7262  -0.4271  -0.4271   0.3969   4.1656  
+
+Coefficients:
+                     Estimate Std. Error z value Pr(&gt;|z|)    
+(Intercept)         3.272e-01  6.820e-02   4.798  1.6e-06 ***
+CovidTRUE           7.154e-02  7.204e-02   0.993    0.321    
+HomeTRUE           -1.015e-14  9.645e-02   0.000    1.000    
+CovidTRUE:HomeTRUE  1.122e-14  1.019e-01   0.000    1.000    
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for poisson family taken to be 1)
+
+    Null deviance: 3557.1  on 2799  degrees of freedom
+Residual deviance: 3555.1  on 2796  degrees of freedom
+AIC: 8788.8
+
+Number of Fisher Scoring iterations: 5</code></pre>
+<!-- rnb-output-end -->
+<!-- rnb-chunk-end -->
+
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiUiBOb3RlYm9vayIKb3V0cHV0OiBodG1sX25vdGVib29rCi0tLQoKYGBge3Igc2V0dXAsIGluY2x1ZGU9RkFMU0V9CmtuaXRyOjpvcHRzX2NodW5rJHNldChlY2hvID0gVFJVRSkKbGlicmFyeSh0aWR5dmVyc2UpCmxpYnJhcnkoY2FyKQpgYGAKCgpUaGUgZ29hbCBpcyB0byBrbm93IHdoZXRoZXIgdGhlIGhvbWUgYWR2YW50YWdlIHBlcnNpc3QgdGhyb3VnaCBDb3ZpZD8gVGhpcyBjYW4gYmUgZG9uZSBieSB1c2luZyBQb2lzc29uIHJlZ3Jlc3Npb24gb24gYW4gb3V0Y29tZSB2YXJpYWJsZSAkWV97aWp9JCB3aGljaCBpcyB0aGUgbnVtYmVyIG9mIGdvYWxzIG9mIGEgdGVhbSAkaSQgZm9yIGEgZ2l2ZW4gbWF0Y2ggJG0kLiAgCgpPbmUgY2FuIGRlZmluZSB0aGUgcHJvYmxlbSBhcyBmb2xsb3dzIDogCiRsb2coWSkgPSBcYWxwaGEgKyBcYmV0YV8xIFxjZG90IEggKyBcYmV0YV8yIFxjZG90IEMgKyBcYmV0YV8zIFxjZG90IEggKiAgQyQsIHdoZXJlICRZJCBpcyB0aGUgbnVtYmVyIG9mIGdvYWwgc2NvcmVkLCAkSCQgaXMgYSBib29sZWFuIHNheWluZyB3aGV0aGVyIHRoZSB0ZWFtIHBsYXlzIGF0IGhvbWUsICRDJCBpcyB0aGUgY292aWQgaW5kaWNhdG9yLCBhbmQgJEggXGNkb3QgIEMkIG1hcmtzIHRoZSBpbnRlcmFjdGlvbiBiZXR3ZWVuIGJlaW5nIGF0IEhvbWUgYW5kIHBsYXlpbmcgZHVyaW5nIENvdmlkLgoKYGBge3J9Cm1fMTgxOSA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAxOC0yMDE5LmNzdiIpCm1fMTkyMCA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAxOS0yMDIwLmNzdiIpCm1fMjAyMSA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAyMC0yMDIxLmNzdiIpCm1fMjEyMiA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAyMS0yMDIyLmNzdiIpCgprZXB0X3ZhcmlhYmxlcyA8LSBjKCJEYXRlIiwiSG9tZVRlYW0iLCJBd2F5VGVhbSIsIkZUSEciLCJGVEFHIikKCkRhdGEgPC0gcmJpbmQobV8xODE5WyxrZXB0X3ZhcmlhYmxlc10sbV8xOTIwWyxrZXB0X3ZhcmlhYmxlc10sCiAgICAgICAgICAgICAgbV8yMDIxWyxrZXB0X3ZhcmlhYmxlc10sbV8yMTIyWyxrZXB0X3ZhcmlhYmxlc10pCkRhdGEgPC0gRGF0YSAlPiUgbXV0YXRlX2lmKGlzLmNoYXJhY3Rlcixhcy5mYWN0b3IpICU+JSBtdXRhdGUoRGF0ZSA9IGFzLkRhdGUoRGF0ZSxmb3JtYXQ9IiVkLyVtLyVZIikpCgpjb3ZpZF9zdGFydCA9IGFzLkRhdGUoIjIwMjAtMDMtMTIiLCAnJVktJW0tJWQnKQpjb3ZpZF9lbmQgPSBhcy5EYXRlKCIyMDIxLTAxLTAxIiwgJyVZLSVtLSVkJykKCkRhdGEgPC0gRGF0YSAlPiUgbXV0YXRlKCdjb3ZpZCcgPSBhcy5udW1lcmljKERhdGUgPCBjb3ZpZF9zdGFydCl8YXMubnVtZXJpYyhEYXRlID49IGNvdmlkX2VuZCksJ0ZBTFNFJz1UUlVFKQoKRGF0YSA8LSByYmluZChEYXRhLGNiaW5kKERhdGFbICwgYygiRGF0ZSIsIkF3YXlUZWFtIiwgIkhvbWVUZWFtIiwgIkZUQUciLCAiRlRIRyIsImNvdmlkIildLEZBTFNFKSkKRGF0YSA8LSBzZWxlY3QoRGF0YSxEYXRlLCBIb21lVGVhbSwgRlRIRywgY292aWQsJ0ZBTFNFJykKbmFtZXMoRGF0YSkgPC0gIGMoIkRhdGUiLCJUZWFtIiwgIkdvYWxzIiwgIkNvdmlkIiwgIkhvbWUiKQoKc3RyKERhdGEpCgp0YWJsZShEYXRhJEhvbWUpCgpWaWV3KERhdGEpCmBgYAoKRGF0ZSA9IE1hdGNoIERhdGUgKGRkL21tL3l5KQpIb21lVGVhbSA9IEhvbWUgVGVhbQpBd2F5VGVhbSA9IEF3YXkgVGVhbQpGVEhHID0gRnVsbCBUaW1lIEhvbWUgVGVhbSBHb2FscwpGVEFHID0gRnVsbCBUaW1lIEF3YXkgVGVhbSBHb2FscwpGVFIgPSBGdWxsIFRpbWUgUmVzdWx0IChIPUhvbWUgV2luLCBEPURyYXcsIEE9QXdheSBXaW4pCgoKYGBge3J9CmdtMSA8LSBnbG0oR29hbHMgfiBDb3ZpZCArIEhvbWUsZGF0YT1EYXRhLGZhbWlseSA9IHBvaXNzb24obGluaz0ibG9nIikpCmdtMiA8LSBnbG0oR29hbHMgfiBDb3ZpZCpIb21lLCBkYXRhPURhdGEsIGZhbWlseT1wb2lzc29uKGxpbms9ImxvZyIpKQphbm92YShnbTEsZ20yLHRlc3Q9IkxSVCIpCgp0YWJsZShEYXRhJENvdmlkKQoKc3VtbWFyeShnbTIpCmBgYA==</div>
 
 
 

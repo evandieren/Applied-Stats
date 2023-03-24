@@ -6,7 +6,14 @@ output: html_notebook
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(car)
 ```
+
+
+The goal is to know whether the home advantage persist through Covid? This can be done by using Poisson regression on an outcome variable $Y_{ij}$ which is the number of goals of a team $i$ for a given match $m$.  
+
+One can define the problem as follows : 
+$log(Y) = \alpha + \beta_1 \cdot H + \beta_2 \cdot C + \beta_3 \cdot H *  C$, where $Y$ is the number of goal scored, $H$ is a boolean saying whether the team plays at home, $C$ is the covid indicator, and $H \cdot  C$ marks the interaction between being at Home and playing during Covid.
 
 ```{r}
 m_1819 <- read.csv("Premier_League/2018-2019.csv")
@@ -14,19 +21,26 @@ m_1920 <- read.csv("Premier_League/2019-2020.csv")
 m_2021 <- read.csv("Premier_League/2020-2021.csv")
 m_2122 <- read.csv("Premier_League/2021-2022.csv")
 
-kept_variables <- c("Date","HomeTeam","AwayTeam","FTHG","FTAG","FTR")
+kept_variables <- c("Date","HomeTeam","AwayTeam","FTHG","FTAG")
 
 Data <- rbind(m_1819[,kept_variables],m_1920[,kept_variables],
               m_2021[,kept_variables],m_2122[,kept_variables])
-
 Data <- Data %>% mutate_if(is.character,as.factor) %>% mutate(Date = as.Date(Date,format="%d/%m/%Y"))
+
+covid_start = as.Date("2020-03-12", '%Y-%m-%d')
+covid_end = as.Date("2021-01-01", '%Y-%m-%d')
+
+Data <- Data %>% mutate('covid' = as.numeric(Date < covid_start)|as.numeric(Date >= covid_end),'FALSE'=TRUE)
+
+Data <- rbind(Data,cbind(Data[ , c("Date","AwayTeam", "HomeTeam", "FTAG", "FTHG","covid")],FALSE))
+Data <- select(Data,Date, HomeTeam, FTHG, covid,'FALSE')
+names(Data) <-  c("Date","Team", "Goals", "Covid", "Home")
+
 str(Data)
 
-Data %>%  mutate(covid = case_when(
-                  Date > 06 & hour_admit < 12 ~ "Morning",
-                  hour_admit >= 12 & hour_admit < 17 ~ "Afternoon",
-                  hour_admit >= 17 & hour_admit < 21 ~ "Evening",
-                  hour_admit >=21 | hour_admit <= 6 ~ "Night")
+table(Data$Home)
+
+View(Data)
 ```
 
 Date = Match Date (dd/mm/yy)
@@ -35,3 +49,14 @@ AwayTeam = Away Team
 FTHG = Full Time Home Team Goals
 FTAG = Full Time Away Team Goals
 FTR = Full Time Result (H=Home Win, D=Draw, A=Away Win)
+
+
+```{r}
+gm1 <- glm(Goals ~ Covid + Home,data=Data,family = poisson(link="log"))
+gm2 <- glm(Goals ~ Covid*Home, data=Data, family=poisson(link="log"))
+anova(gm1,gm2,test="LRT")
+
+table(Data$Covid)
+
+summary(gm2)
+```
