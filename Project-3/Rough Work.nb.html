@@ -1774,21 +1774,29 @@ pre code {
 This can be done by using Poisson regression on an outcome variable
 <span class="math inline">\(Y_{ij}\)</span> which is the number of goals
 of a team <span class="math inline">\(i\)</span> for a given match <span class="math inline">\(m\)</span>.</p>
-<p>One can define the problem as follows : <span class="math inline">\(log(Y) = \alpha + \beta_1 \cdot H + \beta_2 \cdot
-C + \beta_3 \cdot H * C\)</span>, where <span class="math inline">\(Y\)</span> is the number of goal scored, <span class="math inline">\(H\)</span> is a boolean saying whether the team
-plays at home, <span class="math inline">\(C\)</span> is the covid
-indicator, and <span class="math inline">\(H \cdot C\)</span> marks the
-interaction between being at Home and playing during Covid.</p>
+<p>One can define the problem as follows : $log(Y_{i,j}) = _1 H + _2 C +
+_3 H * C + _4 T_i + _5 O_j $, where <span class="math inline">\(Y_{i,j}\)</span> is the expected number of goal
+scored by team <span class="math inline">\(T_i\)</span> against opponent
+team <span class="math inline">\(O_j\)</span>, <span class="math inline">\(H\)</span> is a boolean saying whether the team
+<span class="math inline">\(T_i\)</span> plays at home, <span class="math inline">\(C\)</span> is the covid indicator, and <span class="math inline">\(H \cdot C\)</span> marks the interaction between
+being at Home and playing during Covid.</p>
+<p>Assumptions : * We do not make a difference for the coefficients of a
+given team wrt to each season, therefore Man-U will have the same
+coefficient between 2019 and 2022. One more step would be to check the
+betting values to evaluate the strength of a given team wrt to the
+years, but that is out of the scope of this project. * We assume that
+the number of goals would follow a Poisson distribution as previously
+described.</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudGFibGUoRGF0YSRIb21lKVxuXG5gYGAifQ== -->
-<pre class="r"><code>table(Data$Home)
-</code></pre>
-<!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiXG5GQUxTRSAgVFJVRSBcbiAxNDAwICAxNDAwIFxuIn0= -->
-<pre><code>
-FALSE  TRUE 
- 1400  1400 </code></pre>
+<!-- rnb-output-begin eyJkYXRhIjoiJ2RhdGEuZnJhbWUnOlx0MjgwMCBvYnMuIG9mICA2IHZhcmlhYmxlczpcbiAkIHRlYW0gICAgICAgICAgOiBGYWN0b3Igdy8gMjYgbGV2ZWxzIFwiQXJzZW5hbFwiLFwiQXN0b24gVmlsbGFcIiwuLjogMTcgMyAxMSAxMiAxOCAyMyAyNiAxIDE1IDIxIC4uLlxuICQgb3Bwb25lbnQgICAgICA6IEZhY3RvciB3LyAyNiBsZXZlbHMgXCJBcnNlbmFsXCIsXCJBc3RvbiBWaWxsYVwiLC4uOiAxNCA3IDkgOCAyMiA1IDEwIDE2IDI1IDYgLi4uXG4gJCBnb2FscyAgICAgICAgIDogaW50ICAyIDIgMCAwIDEgMiAyIDAgNCAwIC4uLlxuICQgb3Bwb25lbnRfZ29hbHM6IGludCAgMSAwIDIgMyAyIDAgMiAyIDAgMCAuLi5cbiAkIGNvdmlkICAgICAgICAgOiBGYWN0b3Igdy8gMyBsZXZlbHMgXCJiZWZvcmVcIixcImluXCIsLi46IDEgMSAxIDEgMSAxIDEgMSAxIDEgLi4uXG4gJCBob21lICAgICAgICAgIDogRmFjdG9yIHcvIDIgbGV2ZWxzIFwiMFwiLFwiMVwiOiAyIDIgMiAyIDIgMiAyIDIgMiAyIC4uLlxuIn0= -->
+<pre><code>&#39;data.frame&#39;:   2800 obs. of  6 variables:
+ $ team          : Factor w/ 26 levels &quot;Arsenal&quot;,&quot;Aston Villa&quot;,..: 17 3 11 12 18 23 26 1 15 21 ...
+ $ opponent      : Factor w/ 26 levels &quot;Arsenal&quot;,&quot;Aston Villa&quot;,..: 14 7 9 8 22 5 10 16 25 6 ...
+ $ goals         : int  2 2 0 0 1 2 2 0 4 0 ...
+ $ opponent_goals: int  1 0 2 3 2 0 2 2 0 0 ...
+ $ covid         : Factor w/ 3 levels &quot;before&quot;,&quot;in&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+ $ home          : Factor w/ 2 levels &quot;0&quot;,&quot;1&quot;: 2 2 2 2 2 2 2 2 2 2 ...</code></pre>
 <!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
@@ -1797,40 +1805,105 @@ Team FTHG = Full Time Home Team Goals FTAG = Full Time Away Team Goals
 FTR = Full Time Result (H=Home Win, D=Draw, A=Away Win)</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3VtbWFyeShnbTIpXG5cbmBgYCJ9 -->
-<pre class="r"><code>summary(gm2)
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuc3VtbWFyeShnbV90ZWFtKVxuXG5gYGAifQ== -->
+<pre class="r"><code>summary(gm_team)
 </code></pre>
 <!-- rnb-source-end -->
-<!-- rnb-output-begin eyJkYXRhIjoiXG5DYWxsOlxuZ2xtKGZvcm11bGEgPSBHb2FscyB+IENvdmlkICogSG9tZSwgZmFtaWx5ID0gcG9pc3NvbihsaW5rID0gXCJsb2dcIiksIFxuICAgIGRhdGEgPSBEYXRhKVxuXG5EZXZpYW5jZSBSZXNpZHVhbHM6IFxuICAgIE1pbiAgICAgICAxUSAgIE1lZGlhbiAgICAgICAzUSAgICAgIE1heCAgXG4tMS43MjYyICAtMC40MjcxICAtMC40MjcxICAgMC4zOTY5ICAgNC4xNjU2ICBcblxuQ29lZmZpY2llbnRzOlxuICAgICAgICAgICAgICAgICAgICAgRXN0aW1hdGUgU3RkLiBFcnJvciB6IHZhbHVlIFByKD58enwpICAgIFxuKEludGVyY2VwdCkgICAgICAgICAzLjI3MmUtMDEgIDYuODIwZS0wMiAgIDQuNzk4ICAxLjZlLTA2ICoqKlxuQ292aWRUUlVFICAgICAgICAgICA3LjE1NGUtMDIgIDcuMjA0ZS0wMiAgIDAuOTkzICAgIDAuMzIxICAgIFxuSG9tZVRSVUUgICAgICAgICAgIC0xLjAxNWUtMTQgIDkuNjQ1ZS0wMiAgIDAuMDAwICAgIDEuMDAwICAgIFxuQ292aWRUUlVFOkhvbWVUUlVFICAxLjEyMmUtMTQgIDEuMDE5ZS0wMSAgIDAuMDAwICAgIDEuMDAwICAgIFxuLS0tXG5TaWduaWYuIGNvZGVzOiAgMCDigJgqKirigJkgMC4wMDEg4oCYKirigJkgMC4wMSDigJgq4oCZIDAuMDUg4oCYLuKAmSAwLjEg4oCYIOKAmSAxXG5cbihEaXNwZXJzaW9uIHBhcmFtZXRlciBmb3IgcG9pc3NvbiBmYW1pbHkgdGFrZW4gdG8gYmUgMSlcblxuICAgIE51bGwgZGV2aWFuY2U6IDM1NTcuMSAgb24gMjc5OSAgZGVncmVlcyBvZiBmcmVlZG9tXG5SZXNpZHVhbCBkZXZpYW5jZTogMzU1NS4xICBvbiAyNzk2ICBkZWdyZWVzIG9mIGZyZWVkb21cbkFJQzogODc4OC44XG5cbk51bWJlciBvZiBGaXNoZXIgU2NvcmluZyBpdGVyYXRpb25zOiA1XG4ifQ== -->
+<!-- rnb-output-begin eyJkYXRhIjoiXG5DYWxsOlxuZ2xtKGZvcm11bGEgPSBnb2FscyB+IHRlYW0gKyBvcHBvbmVudCArIGhvbWUgKyBjb3ZpZCArIGNvdmlkOmhvbWUgLSBcbiAgICAxLCBmYW1pbHkgPSBwb2lzc29uKGxpbmsgPSBcImxvZ1wiKSwgZGF0YSA9IERhdGEpXG5cbkRldmlhbmNlIFJlc2lkdWFsczogXG4gICAgTWluICAgICAgIDFRICAgTWVkaWFuICAgICAgIDNRICAgICAgTWF4ICBcbi0yLjU1ODIgIC0xLjE0OTYgIC0wLjEwNDggICAwLjUyMTIgICA0LjMwMTQgIFxuXG5Db2VmZmljaWVudHM6XG4gICAgICAgICAgICAgICAgICAgICAgICAgIEVzdGltYXRlIFN0ZC4gRXJyb3IgeiB2YWx1ZSBQcig+fHp8KSAgICBcbnRlYW1BcnNlbmFsICAgICAgICAgICAgICAgMC4yNzcxMTkgICAwLjEwNzc2OCAgIDIuNTcxIDAuMDEwMTI4ICogIFxudGVhbUFzdG9uIFZpbGxhICAgICAgICAgICAwLjE0MzYwNyAgIDAuMTE4NjM5ICAgMS4yMTAgMC4yMjYxMDcgICAgXG50ZWFtQm91cm5lbW91dGggICAgICAgICAgIDAuMDM3MTYzICAgMC4xMzU0NDcgICAwLjI3NCAwLjc4Mzc5NSAgICBcbnRlYW1CcmVudGZvcmQgICAgICAgICAgICAgMC4wNTEzNjcgICAwLjE2OTgyMSAgIDAuMzAyIDAuNzYyMjg5ICAgIFxudGVhbUJyaWdodG9uICAgICAgICAgICAgIC0wLjE0MDg4NSAgIDAuMTE1ODkyICAtMS4yMTYgMC4yMjQxMTYgICAgXG50ZWFtQnVybmxleSAgICAgICAgICAgICAgLTAuMTcyMjY5ICAgMC4xMTY2MzAgIC0xLjQ3NyAwLjEzOTY2MCAgICBcbnRlYW1DYXJkaWZmICAgICAgICAgICAgICAtMC4zMjE0NzggICAwLjE4OTA2OSAgLTEuNzAwIDAuMDg5MDcxIC4gIFxudGVhbUNoZWxzZWEgICAgICAgICAgICAgICAwLjMzMzMyMCAgIDAuMTAzNjMwICAgMy4yMTYgMC4wMDEyOTggKiogXG50ZWFtQ3J5c3RhbCBQYWxhY2UgICAgICAgLTAuMDI4MjE4ICAgMC4xMTIzNjYgIC0wLjI1MSAwLjgwMTcxNiAgICBcbnRlYW1FdmVydG9uICAgICAgICAgICAgICAgMC4wNDk0MjEgICAwLjExMDcwMyAgIDAuNDQ2IDAuNjU1Mjg2ICAgIFxudGVhbUZ1bGhhbSAgICAgICAgICAgICAgIC0wLjM5ODgwNiAgIDAuMTUyMDM3ICAtMi42MjMgMC4wMDg3MTQgKiogXG50ZWFtSHVkZGVyc2ZpZWxkICAgICAgICAgLTAuNzUwNzI1ICAgMC4yMjc1NjIgIC0zLjI5OSAwLjAwMDk3MCAqKipcbnRlYW1MZWVkcyAgICAgICAgICAgICAgICAgMC4xNTYxMjEgICAwLjEzMDgwNCAgIDEuMTk0IDAuMjMyNjU1ICAgIFxudGVhbUxlaWNlc3RlciAgICAgICAgICAgICAwLjMyNTM3MSAgIDAuMTA0NDMxICAgMy4xMTYgMC4wMDE4MzUgKiogXG50ZWFtTGl2ZXJwb29sICAgICAgICAgICAgIDAuNTg2MTY0ICAgMC4wOTkyMTcgICA1LjkwOCAzLjQ2ZS0wOSAqKipcbnRlYW1NYW4gQ2l0eSAgICAgICAgICAgICAgMC42ODg2MjYgICAwLjA5Nzc4MCAgIDcuMDQzIDEuODllLTEyICoqKlxudGVhbU1hbiBVbml0ZWQgICAgICAgICAgICAwLjMxODExMCAgIDAuMTA0MTkyICAgMy4wNTMgMC4wMDIyNjUgKiogXG50ZWFtTmV3Y2FzdGxlICAgICAgICAgICAgLTAuMDc5Mjk1ICAgMC4xMTM5NTUgIC0wLjY5NiAwLjQ4NjUyOCAgICBcbnRlYW1Ob3J3aWNoICAgICAgICAgICAgICAtMC40NzM5ODQgICAwLjE2NzgzMCAgLTIuODI0IDAuMDA0NzQwICoqIFxudGVhbVNoZWZmaWVsZCBVbml0ZWQgICAgIC0wLjQ1OTkxNiAgIDAuMTY2MTc4ICAtMi43NjggMC4wMDU2NDcgKiogXG50ZWFtU291dGhhbXB0b24gICAgICAgICAgIDAuMDAzNjI2ICAgMC4xMTI0ODUgICAwLjAzMiAwLjk3NDI4NCAgICBcbnRlYW1Ub3R0ZW5oYW0gICAgICAgICAgICAgMC4zNjYwOTYgICAwLjEwMzQ3NiAgIDMuNTM4IDAuMDAwNDAzICoqKlxudGVhbVdhdGZvcmQgICAgICAgICAgICAgIC0wLjExNjQ0MCAgIDAuMTI1MDA4ICAtMC45MzEgMC4zNTE2MTcgICAgXG50ZWFtV2VzdCBCcm9tICAgICAgICAgICAgLTAuMjE2ODYwICAgMC4xOTE0MzggIC0xLjEzMyAwLjI1NzMwMCAgICBcbnRlYW1XZXN0IEhhbSAgICAgICAgICAgICAgMC4xODgwNDEgICAwLjEwNzQzNCAgIDEuNzUwIDAuMDgwMDY4IC4gIFxudGVhbVdvbHZlcyAgICAgICAgICAgICAgIC0wLjA4NjcyNiAgIDAuMTE0Mjc3ICAtMC43NTkgMC40NDc5MDQgICAgXG5vcHBvbmVudEFzdG9uIFZpbGxhICAgICAgIDAuMTY2NDc3ICAgMC4xMTIwODUgICAxLjQ4NSAwLjEzNzQ3MSAgICBcbm9wcG9uZW50Qm91cm5lbW91dGggICAgICAgMC4zMzczNjYgICAwLjEyMzgzNiAgIDIuNzI0IDAuMDA2NDQ0ICoqIFxub3Bwb25lbnRCcmVudGZvcmQgICAgICAgICAwLjE0MjI2MSAgIDAuMTU2NTI4ICAgMC45MDkgMC4zNjM0MjcgICAgXG5vcHBvbmVudEJyaWdodG9uICAgICAgICAgIDAuMDYwODExICAgMC4xMDU2NDUgICAwLjU3NiAwLjU2NDg3NiAgICBcbm9wcG9uZW50QnVybmxleSAgICAgICAgICAgMC4xOTM1NDQgICAwLjEwMjQ2OCAgIDEuODg5IDAuMDU4OTE1IC4gIFxub3Bwb25lbnRDYXJkaWZmICAgICAgICAgICAwLjM2ODE3MSAgIDAuMTQzOTI1ICAgMi41NTggMC4wMTA1MjUgKiAgXG5vcHBvbmVudENoZWxzZWEgICAgICAgICAgLTAuMTc4MTA5ICAgMC4xMTMxNDQgIC0xLjU3NCAwLjExNTQ0NyAgICBcbm9wcG9uZW50Q3J5c3RhbCBQYWxhY2UgICAgMC4xMTYyNjEgICAwLjEwNDUzNCAgIDEuMTEyIDAuMjY2MDYwICAgIFxub3Bwb25lbnRFdmVydG9uICAgICAgICAgICAwLjEyNDUxOCAgIDAuMTA0Mzc2ICAgMS4xOTMgMC4yMzI4ODAgICAgXG5vcHBvbmVudEZ1bGhhbSAgICAgICAgICAgIDAuMzQyODkwICAgMC4xMTU5ODggICAyLjk1NiAwLjAwMzExNCAqKiBcbm9wcG9uZW50SHVkZGVyc2ZpZWxkICAgICAgMC40NTMxMjkgICAwLjEzOTIwMiAgIDMuMjU1IDAuMDAxMTMzICoqIFxub3Bwb25lbnRMZWVkcyAgICAgICAgICAgICAwLjM0MTc2MyAgIDAuMTE2NzQ1ICAgMi45MjcgMC4wMDM0MTggKiogXG5vcHBvbmVudExlaWNlc3RlciAgICAgICAgIDAuMDU4MzgwICAgMC4xMDYzNjAgICAwLjU0OSAwLjU4MzA3OSAgICBcbm9wcG9uZW50TGl2ZXJwb29sICAgICAgICAtMC40NzM0MzcgICAwLjEyNDAwNCAgLTMuODE4IDAuMDAwMTM1ICoqKlxub3Bwb25lbnRNYW4gQ2l0eSAgICAgICAgIC0wLjQxODE0NSAgIDAuMTIyMjU3ICAtMy40MjAgMC4wMDA2MjYgKioqXG5vcHBvbmVudE1hbiBVbml0ZWQgICAgICAgIDAuMDY1NTczICAgMC4xMDYyNjIgICAwLjYxNyAwLjUzNzE3NCAgICBcbm9wcG9uZW50TmV3Y2FzdGxlICAgICAgICAgMC4xODU2NzIgICAwLjEwMjc5NSAgIDEuODA2IDAuMDcwODgxIC4gIFxub3Bwb25lbnROb3J3aWNoICAgICAgICAgICAwLjQ1NjE5NSAgIDAuMTE2NjU3ICAgMy45MTEgOS4yMWUtMDUgKioqXG5vcHBvbmVudFNoZWZmaWVsZCBVbml0ZWQgIDAuMDU4NDk2ICAgMC4xMzI0NzAgICAwLjQ0MiAwLjY1ODc5NCAgICBcbm9wcG9uZW50U291dGhhbXB0b24gICAgICAgMC4zNDE0MTYgICAwLjA5OTM3NyAgIDMuNDM2IDAuMDAwNTkxICoqKlxub3Bwb25lbnRUb3R0ZW5oYW0gICAgICAgIC0wLjA4ODAzMSAgIDAuMTEwMzYzICAtMC43OTggMC40MjUwNzUgICAgXG5vcHBvbmVudFdhdGZvcmQgICAgICAgICAgIDAuMzE0MzI0ICAgMC4xMDc4ODMgICAyLjkxNCAwLjAwMzU3MyAqKiBcbm9wcG9uZW50V2VzdCBCcm9tICAgICAgICAgMC40ODE2NDYgICAwLjE0MDkzNyAgIDMuNDE3IDAuMDAwNjMyICoqKlxub3Bwb25lbnRXZXN0IEhhbSAgICAgICAgICAwLjEzMTQ3OCAgIDAuMTA0Mzg0ICAgMS4yNjAgMC4yMDc4MjUgICAgXG5vcHBvbmVudFdvbHZlcyAgICAgICAgICAgLTAuMDI1MzkwICAgMC4xMDc4MDkgIC0wLjIzNiAwLjgxMzgxNSAgICBcbmhvbWUxICAgICAgICAgICAgICAgICAgICAgMC4xOTQ0OTAgICAwLjA0NzUxMiAgIDQuMDkzIDQuMjVlLTA1ICoqKlxuY292aWRpbiAgICAgICAgICAgICAgICAgICAwLjA1NTc5OCAgIDAuMDYwMzAxICAgMC45MjUgMC4zNTQ3OTYgICAgXG5jb3ZpZGxhdGVyICAgICAgICAgICAgICAgIDAuMDA3NjMzICAgMC4wNjAyNTQgICAwLjEyNyAwLjg5OTE5OSAgICBcbmhvbWUxOmNvdmlkaW4gICAgICAgICAgICAtMC4xODY2NzcgICAwLjA3ODUwOSAgLTIuMzc4IDAuMDE3NDE3ICogIFxuaG9tZTE6Y292aWRsYXRlciAgICAgICAgIC0wLjA0NjY5NiAgIDAuMDc3NTQxICAtMC42MDIgMC41NDcwMzcgICAgXG4tLS1cblNpZ25pZi4gY29kZXM6ICAwIOKAmCoqKuKAmSAwLjAwMSDigJgqKuKAmSAwLjAxIOKAmCrigJkgMC4wNSDigJgu4oCZIDAuMSDigJgg4oCZIDFcblxuKERpc3BlcnNpb24gcGFyYW1ldGVyIGZvciBwb2lzc29uIGZhbWlseSB0YWtlbiB0byBiZSAxKVxuXG4gICAgTnVsbCBkZXZpYW5jZTogMzk5OC44ICBvbiAyODAwICBkZWdyZWVzIG9mIGZyZWVkb21cblJlc2lkdWFsIGRldmlhbmNlOiAzMDUxLjEgIG9uIDI3NDQgIGRlZ3JlZXMgb2YgZnJlZWRvbVxuQUlDOiA4MTQ3LjhcblxuTnVtYmVyIG9mIEZpc2hlciBTY29yaW5nIGl0ZXJhdGlvbnM6IDVcbiJ9 -->
 <pre><code>
 Call:
-glm(formula = Goals ~ Covid * Home, family = poisson(link = &quot;log&quot;), 
-    data = Data)
+glm(formula = goals ~ team + opponent + home + covid + covid:home - 
+    1, family = poisson(link = &quot;log&quot;), data = Data)
 
 Deviance Residuals: 
     Min       1Q   Median       3Q      Max  
--1.7262  -0.4271  -0.4271   0.3969   4.1656  
+-2.5582  -1.1496  -0.1048   0.5212   4.3014  
 
 Coefficients:
-                     Estimate Std. Error z value Pr(&gt;|z|)    
-(Intercept)         3.272e-01  6.820e-02   4.798  1.6e-06 ***
-CovidTRUE           7.154e-02  7.204e-02   0.993    0.321    
-HomeTRUE           -1.015e-14  9.645e-02   0.000    1.000    
-CovidTRUE:HomeTRUE  1.122e-14  1.019e-01   0.000    1.000    
+                          Estimate Std. Error z value Pr(&gt;|z|)    
+teamArsenal               0.277119   0.107768   2.571 0.010128 *  
+teamAston Villa           0.143607   0.118639   1.210 0.226107    
+teamBournemouth           0.037163   0.135447   0.274 0.783795    
+teamBrentford             0.051367   0.169821   0.302 0.762289    
+teamBrighton             -0.140885   0.115892  -1.216 0.224116    
+teamBurnley              -0.172269   0.116630  -1.477 0.139660    
+teamCardiff              -0.321478   0.189069  -1.700 0.089071 .  
+teamChelsea               0.333320   0.103630   3.216 0.001298 ** 
+teamCrystal Palace       -0.028218   0.112366  -0.251 0.801716    
+teamEverton               0.049421   0.110703   0.446 0.655286    
+teamFulham               -0.398806   0.152037  -2.623 0.008714 ** 
+teamHuddersfield         -0.750725   0.227562  -3.299 0.000970 ***
+teamLeeds                 0.156121   0.130804   1.194 0.232655    
+teamLeicester             0.325371   0.104431   3.116 0.001835 ** 
+teamLiverpool             0.586164   0.099217   5.908 3.46e-09 ***
+teamMan City              0.688626   0.097780   7.043 1.89e-12 ***
+teamMan United            0.318110   0.104192   3.053 0.002265 ** 
+teamNewcastle            -0.079295   0.113955  -0.696 0.486528    
+teamNorwich              -0.473984   0.167830  -2.824 0.004740 ** 
+teamSheffield United     -0.459916   0.166178  -2.768 0.005647 ** 
+teamSouthampton           0.003626   0.112485   0.032 0.974284    
+teamTottenham             0.366096   0.103476   3.538 0.000403 ***
+teamWatford              -0.116440   0.125008  -0.931 0.351617    
+teamWest Brom            -0.216860   0.191438  -1.133 0.257300    
+teamWest Ham              0.188041   0.107434   1.750 0.080068 .  
+teamWolves               -0.086726   0.114277  -0.759 0.447904    
+opponentAston Villa       0.166477   0.112085   1.485 0.137471    
+opponentBournemouth       0.337366   0.123836   2.724 0.006444 ** 
+opponentBrentford         0.142261   0.156528   0.909 0.363427    
+opponentBrighton          0.060811   0.105645   0.576 0.564876    
+opponentBurnley           0.193544   0.102468   1.889 0.058915 .  
+opponentCardiff           0.368171   0.143925   2.558 0.010525 *  
+opponentChelsea          -0.178109   0.113144  -1.574 0.115447    
+opponentCrystal Palace    0.116261   0.104534   1.112 0.266060    
+opponentEverton           0.124518   0.104376   1.193 0.232880    
+opponentFulham            0.342890   0.115988   2.956 0.003114 ** 
+opponentHuddersfield      0.453129   0.139202   3.255 0.001133 ** 
+opponentLeeds             0.341763   0.116745   2.927 0.003418 ** 
+opponentLeicester         0.058380   0.106360   0.549 0.583079    
+opponentLiverpool        -0.473437   0.124004  -3.818 0.000135 ***
+opponentMan City         -0.418145   0.122257  -3.420 0.000626 ***
+opponentMan United        0.065573   0.106262   0.617 0.537174    
+opponentNewcastle         0.185672   0.102795   1.806 0.070881 .  
+opponentNorwich           0.456195   0.116657   3.911 9.21e-05 ***
+opponentSheffield United  0.058496   0.132470   0.442 0.658794    
+opponentSouthampton       0.341416   0.099377   3.436 0.000591 ***
+opponentTottenham        -0.088031   0.110363  -0.798 0.425075    
+opponentWatford           0.314324   0.107883   2.914 0.003573 ** 
+opponentWest Brom         0.481646   0.140937   3.417 0.000632 ***
+opponentWest Ham          0.131478   0.104384   1.260 0.207825    
+opponentWolves           -0.025390   0.107809  -0.236 0.813815    
+home1                     0.194490   0.047512   4.093 4.25e-05 ***
+covidin                   0.055798   0.060301   0.925 0.354796    
+covidlater                0.007633   0.060254   0.127 0.899199    
+home1:covidin            -0.186677   0.078509  -2.378 0.017417 *  
+home1:covidlater         -0.046696   0.077541  -0.602 0.547037    
 ---
 Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 (Dispersion parameter for poisson family taken to be 1)
 
-    Null deviance: 3557.1  on 2799  degrees of freedom
-Residual deviance: 3555.1  on 2796  degrees of freedom
-AIC: 8788.8
+    Null deviance: 3998.8  on 2800  degrees of freedom
+Residual deviance: 3051.1  on 2744  degrees of freedom
+AIC: 8147.8
 
 Number of Fisher Scoring iterations: 5</code></pre>
 <!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<!-- rnb-text-end -->
+<!-- rnb-chunk-begin -->
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuY29uZmludChnbTMpXG5gYGAifQ== -->
+<pre class="r"><code>confint(gm3)</code></pre>
+<!-- rnb-source-end -->
+<!-- rnb-chunk-end -->
+<!-- rnb-text-begin -->
+<div id="answering-the-questions" class="section level1">
+<h1>Answering the questions</h1>
+<p>See final report</p>
+<!-- rnb-text-end -->
+</div>
 
-<div id="rmd-source-code">LS0tCnRpdGxlOiAiUiBOb3RlYm9vayIKb3V0cHV0OiBodG1sX25vdGVib29rCi0tLQoKYGBge3Igc2V0dXAsIGluY2x1ZGU9RkFMU0V9CmtuaXRyOjpvcHRzX2NodW5rJHNldChlY2hvID0gVFJVRSkKbGlicmFyeSh0aWR5dmVyc2UpCmxpYnJhcnkoY2FyKQpgYGAKCgpUaGUgZ29hbCBpcyB0byBrbm93IHdoZXRoZXIgdGhlIGhvbWUgYWR2YW50YWdlIHBlcnNpc3QgdGhyb3VnaCBDb3ZpZD8gVGhpcyBjYW4gYmUgZG9uZSBieSB1c2luZyBQb2lzc29uIHJlZ3Jlc3Npb24gb24gYW4gb3V0Y29tZSB2YXJpYWJsZSAkWV97aWp9JCB3aGljaCBpcyB0aGUgbnVtYmVyIG9mIGdvYWxzIG9mIGEgdGVhbSAkaSQgZm9yIGEgZ2l2ZW4gbWF0Y2ggJG0kLiAgCgpPbmUgY2FuIGRlZmluZSB0aGUgcHJvYmxlbSBhcyBmb2xsb3dzIDogCiRsb2coWSkgPSBcYWxwaGEgKyBcYmV0YV8xIFxjZG90IEggKyBcYmV0YV8yIFxjZG90IEMgKyBcYmV0YV8zIFxjZG90IEggKiAgQyQsIHdoZXJlICRZJCBpcyB0aGUgbnVtYmVyIG9mIGdvYWwgc2NvcmVkLCAkSCQgaXMgYSBib29sZWFuIHNheWluZyB3aGV0aGVyIHRoZSB0ZWFtIHBsYXlzIGF0IGhvbWUsICRDJCBpcyB0aGUgY292aWQgaW5kaWNhdG9yLCBhbmQgJEggXGNkb3QgIEMkIG1hcmtzIHRoZSBpbnRlcmFjdGlvbiBiZXR3ZWVuIGJlaW5nIGF0IEhvbWUgYW5kIHBsYXlpbmcgZHVyaW5nIENvdmlkLgoKYGBge3J9Cm1fMTgxOSA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAxOC0yMDE5LmNzdiIpCm1fMTkyMCA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAxOS0yMDIwLmNzdiIpCm1fMjAyMSA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAyMC0yMDIxLmNzdiIpCm1fMjEyMiA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAyMS0yMDIyLmNzdiIpCgprZXB0X3ZhcmlhYmxlcyA8LSBjKCJEYXRlIiwiSG9tZVRlYW0iLCJBd2F5VGVhbSIsIkZUSEciLCJGVEFHIikKCkRhdGEgPC0gcmJpbmQobV8xODE5WyxrZXB0X3ZhcmlhYmxlc10sbV8xOTIwWyxrZXB0X3ZhcmlhYmxlc10sCiAgICAgICAgICAgICAgbV8yMDIxWyxrZXB0X3ZhcmlhYmxlc10sbV8yMTIyWyxrZXB0X3ZhcmlhYmxlc10pCkRhdGEgPC0gRGF0YSAlPiUgbXV0YXRlX2lmKGlzLmNoYXJhY3Rlcixhcy5mYWN0b3IpICU+JSBtdXRhdGUoRGF0ZSA9IGFzLkRhdGUoRGF0ZSxmb3JtYXQ9IiVkLyVtLyVZIikpCgpjb3ZpZF9zdGFydCA9IGFzLkRhdGUoIjIwMjAtMDMtMTIiLCAnJVktJW0tJWQnKQpjb3ZpZF9lbmQgPSBhcy5EYXRlKCIyMDIxLTAxLTAxIiwgJyVZLSVtLSVkJykKCkRhdGEgPC0gRGF0YSAlPiUgbXV0YXRlKCdjb3ZpZCcgPSBhcy5udW1lcmljKERhdGUgPCBjb3ZpZF9zdGFydCl8YXMubnVtZXJpYyhEYXRlID49IGNvdmlkX2VuZCksJ0ZBTFNFJz1UUlVFKQoKRGF0YSA8LSByYmluZChEYXRhLGNiaW5kKERhdGFbICwgYygiRGF0ZSIsIkF3YXlUZWFtIiwgIkhvbWVUZWFtIiwgIkZUQUciLCAiRlRIRyIsImNvdmlkIildLEZBTFNFKSkKRGF0YSA8LSBzZWxlY3QoRGF0YSxEYXRlLCBIb21lVGVhbSwgRlRIRywgY292aWQsJ0ZBTFNFJykKbmFtZXMoRGF0YSkgPC0gIGMoIkRhdGUiLCJUZWFtIiwgIkdvYWxzIiwgIkNvdmlkIiwgIkhvbWUiKQoKc3RyKERhdGEpCgp0YWJsZShEYXRhJEhvbWUpCgpWaWV3KERhdGEpCmBgYAoKRGF0ZSA9IE1hdGNoIERhdGUgKGRkL21tL3l5KQpIb21lVGVhbSA9IEhvbWUgVGVhbQpBd2F5VGVhbSA9IEF3YXkgVGVhbQpGVEhHID0gRnVsbCBUaW1lIEhvbWUgVGVhbSBHb2FscwpGVEFHID0gRnVsbCBUaW1lIEF3YXkgVGVhbSBHb2FscwpGVFIgPSBGdWxsIFRpbWUgUmVzdWx0IChIPUhvbWUgV2luLCBEPURyYXcsIEE9QXdheSBXaW4pCgoKYGBge3J9CmdtMSA8LSBnbG0oR29hbHMgfiBDb3ZpZCArIEhvbWUsZGF0YT1EYXRhLGZhbWlseSA9IHBvaXNzb24obGluaz0ibG9nIikpCmdtMiA8LSBnbG0oR29hbHMgfiBDb3ZpZCpIb21lLCBkYXRhPURhdGEsIGZhbWlseT1wb2lzc29uKGxpbms9ImxvZyIpKQphbm92YShnbTEsZ20yLHRlc3Q9IkxSVCIpCgp0YWJsZShEYXRhJENvdmlkKQoKc3VtbWFyeShnbTIpCmBgYA==</div>
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiUiBOb3RlYm9vayIKb3V0cHV0OiBodG1sX25vdGVib29rCi0tLQoKYGBge3Igc2V0dXAsIGluY2x1ZGU9RkFMU0V9CmtuaXRyOjpvcHRzX2NodW5rJHNldChlY2hvID0gVFJVRSkKbGlicmFyeSh0aWR5dmVyc2UpCmxpYnJhcnkoY2FyKQpgYGAKCgpUaGUgZ29hbCBpcyB0byBrbm93IHdoZXRoZXIgdGhlIGhvbWUgYWR2YW50YWdlIHBlcnNpc3QgdGhyb3VnaCBDb3ZpZD8gVGhpcyBjYW4gYmUgZG9uZSBieSB1c2luZyBQb2lzc29uIHJlZ3Jlc3Npb24gb24gYW4gb3V0Y29tZSB2YXJpYWJsZSAkWV97aWp9JCB3aGljaCBpcyB0aGUgbnVtYmVyIG9mIGdvYWxzIG9mIGEgdGVhbSAkaSQgZm9yIGEgZ2l2ZW4gbWF0Y2ggJG0kLiAgCgpPbmUgY2FuIGRlZmluZSB0aGUgcHJvYmxlbSBhcyBmb2xsb3dzIDogCiRsb2coWV97aSxqfSkgPSBcYmV0YV8xIFxjZG90IEggKyBcYmV0YV8yIFxjZG90IEMgKyBcYmV0YV8zIFxjZG90IEggKiAgQyArIFxiZXRhXzQgXGNkb3QgVF9pICsgXGJldGFfNSBcY2RvdCBPX2ogJCwgd2hlcmUgJFlfe2ksan0kIGlzIHRoZSBleHBlY3RlZCBudW1iZXIgb2YgZ29hbCBzY29yZWQgYnkgdGVhbSAkVF9pJCBhZ2FpbnN0IG9wcG9uZW50IHRlYW0gJE9faiQsICRIJCBpcyBhIGJvb2xlYW4gc2F5aW5nIHdoZXRoZXIgdGhlIHRlYW0gJFRfaSQgcGxheXMgYXQgaG9tZSwgJEMkIGlzIHRoZSBjb3ZpZCBpbmRpY2F0b3IsIGFuZCAkSCBcY2RvdCAgQyQgbWFya3MgdGhlIGludGVyYWN0aW9uIGJldHdlZW4gYmVpbmcgYXQgSG9tZSBhbmQgcGxheWluZyBkdXJpbmcgQ292aWQuCgoKQXNzdW1wdGlvbnMgOgoqIFdlIGRvIG5vdCBtYWtlIGEgZGlmZmVyZW5jZSBmb3IgdGhlIGNvZWZmaWNpZW50cyBvZiBhIGdpdmVuIHRlYW0gd3J0IHRvIGVhY2ggc2Vhc29uLCB0aGVyZWZvcmUgTWFuLVUgd2lsbCBoYXZlIHRoZSBzYW1lIGNvZWZmaWNpZW50IGJldHdlZW4gMjAxOSBhbmQgMjAyMi4gT25lIG1vcmUgc3RlcCB3b3VsZCBiZSB0byBjaGVjayB0aGUgYmV0dGluZyB2YWx1ZXMgdG8gZXZhbHVhdGUgdGhlIHN0cmVuZ3RoIG9mIGEgZ2l2ZW4gdGVhbSB3cnQgdG8gdGhlIHllYXJzLCBidXQgdGhhdCBpcyBvdXQgb2YgdGhlIHNjb3BlIG9mIHRoaXMgcHJvamVjdC4KKiBXZSBhc3N1bWUgdGhhdCB0aGUgbnVtYmVyIG9mIGdvYWxzIHdvdWxkIGZvbGxvdyBhIFBvaXNzb24gZGlzdHJpYnV0aW9uIGFzIHByZXZpb3VzbHkgZGVzY3JpYmVkLgoKYGBge3IsZWNobz1GQUxTRSxtZXNzYWdlPUZBTFNFLHdhcm5pbmc9RkFMU0V9Cm1fMTgxOSA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAxOC0yMDE5LmNzdiIpCm1fMTkyMCA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAxOS0yMDIwLmNzdiIpCm1fMjAyMSA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAyMC0yMDIxLmNzdiIpCm1fMjEyMiA8LSByZWFkLmNzdigiUHJlbWllcl9MZWFndWUvMjAyMS0yMDIyLmNzdiIpCgptXzE4MTkkY292aWQgPSAiYmVmb3JlIgptXzE5MjAkY292aWQgPSAiYmVmb3JlIgptXzIwMjEkY292aWQgPSAiaW4iCm1fMjEyMiRjb3ZpZCA9ICJsYXRlciIKCmtlcHRfdmFyaWFibGVzIDwtIGMoIkhvbWVUZWFtIiwiQXdheVRlYW0iLCJGVEhHIiwiRlRBRyIsImNvdmlkIikKCkRhdGEgPC0gcmJpbmQobV8xODE5WyxrZXB0X3ZhcmlhYmxlc10sbV8xOTIwWyxrZXB0X3ZhcmlhYmxlc10sCiAgICAgICAgICAgICAgbV8yMDIxWyxrZXB0X3ZhcmlhYmxlc10sbV8yMTIyWyxrZXB0X3ZhcmlhYmxlc10pCgpBd2F5RGF0YSA8LSBEYXRhCkF3YXlEYXRhJGhvbWUgPSAwCm5hbWVzKEF3YXlEYXRhKSA8LSBjKCJvcHBvbmVudCIsInRlYW0iLCJvcHBvbmVudF9nb2FscyIsImdvYWxzIiwiY292aWQiLCAiaG9tZSIpCgoKRGF0YSRob21lID0gMQpuYW1lcyhEYXRhKSA8LSAgYygidGVhbSIsIm9wcG9uZW50IiwiZ29hbHMiLCJvcHBvbmVudF9nb2FscyIsICJjb3ZpZCIsICJob21lIikKCgpEYXRhIDwtIHJiaW5kKERhdGEsQXdheURhdGEpCgpzdHIoRGF0YSkKCkRhdGEgPC0gRGF0YSAlPiUgbXV0YXRlKHRlYW09YXMuZmFjdG9yKHRlYW0pLAogICAgICAgICAgICAgICAgICAgICAgICBvcHBvbmVudCA9IGFzLmZhY3RvcihvcHBvbmVudCksCiAgICAgICAgICAgICAgICAgICAgICAgIGNvdmlkID0gYXMuZmFjdG9yKGNvdmlkKSwKICAgICAgICAgICAgICAgICAgICAgICAgaG9tZSA9IGFzLmZhY3Rvcihob21lKSkKCnN0cihEYXRhKQoKI2NoZWNraW5nCmNhdCh0YWJsZShEYXRhJGhvbWUpKQpjYXQodGFibGUoRGF0YSRjb3ZpZCkpCgp0YWJsZShEYXRhJGNvdmlkKQpgYGAKCkRhdGUgPSBNYXRjaCBEYXRlIChkZC9tbS95eSkKSG9tZVRlYW0gPSBIb21lIFRlYW0KQXdheVRlYW0gPSBBd2F5IFRlYW0KRlRIRyA9IEZ1bGwgVGltZSBIb21lIFRlYW0gR29hbHMKRlRBRyA9IEZ1bGwgVGltZSBBd2F5IFRlYW0gR29hbHMKRlRSID0gRnVsbCBUaW1lIFJlc3VsdCAoSD1Ib21lIFdpbiwgRD1EcmF3LCBBPUF3YXkgV2luKQoKYGBge3J9CmdtX2Jhc2ljIDwtIGdsbShnb2FscyB+IGNvdmlkICsgaG9tZSArIGhvbWU6Y292aWQsZGF0YT1EYXRhLGZhbWlseSA9IHBvaXNzb24obGluaz0ibG9nIikpCnN1bW1hcnkoZ21fYmFzaWMpCmFub3ZhKGdtX2Jhc2ljLHR5cGU9Mix0ZXN0PSJMUlQiKQoKZ21fdGVhbSA8LSBnbG0oZ29hbHMgfiB0ZWFtICsgb3Bwb25lbnQgKyBob21lICsgY292aWQgKyBjb3ZpZDpob21lIC0gMSwgZGF0YT1EYXRhLCBmYW1pbHk9cG9pc3NvbihsaW5rPSJsb2ciKSkKCnN1bW1hcnkoZ21fdGVhbSkKYGBgCgpgYGB7cn0KY29uZmludChnbTMpCmBgYAoKCiMgQW5zd2VyaW5nIHRoZSBxdWVzdGlvbnMKClNlZSBmaW5hbCByZXBvcnQK</div>
 
 
 

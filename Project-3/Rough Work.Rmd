@@ -13,34 +13,54 @@ library(car)
 The goal is to know whether the home advantage persist through Covid? This can be done by using Poisson regression on an outcome variable $Y_{ij}$ which is the number of goals of a team $i$ for a given match $m$.  
 
 One can define the problem as follows : 
-$log(Y) = \alpha + \beta_1 \cdot H + \beta_2 \cdot C + \beta_3 \cdot H *  C$, where $Y$ is the number of goal scored, $H$ is a boolean saying whether the team plays at home, $C$ is the covid indicator, and $H \cdot  C$ marks the interaction between being at Home and playing during Covid.
+$log(Y_{i,j}) = \beta_1 \cdot H + \beta_2 \cdot C + \beta_3 \cdot H *  C + \beta_4 \cdot T_i + \beta_5 \cdot O_j $, where $Y_{i,j}$ is the expected number of goal scored by team $T_i$ against opponent team $O_j$, $H$ is a boolean saying whether the team $T_i$ plays at home, $C$ is the covid indicator, and $H \cdot  C$ marks the interaction between being at Home and playing during Covid.
 
-```{r}
+
+Assumptions :
+* We do not make a difference for the coefficients of a given team wrt to each season, therefore Man-U will have the same coefficient between 2019 and 2022. One more step would be to check the betting values to evaluate the strength of a given team wrt to the years, but that is out of the scope of this project.
+* We assume that the number of goals would follow a Poisson distribution as previously described.
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
 m_1819 <- read.csv("Premier_League/2018-2019.csv")
 m_1920 <- read.csv("Premier_League/2019-2020.csv")
 m_2021 <- read.csv("Premier_League/2020-2021.csv")
 m_2122 <- read.csv("Premier_League/2021-2022.csv")
 
-kept_variables <- c("Date","HomeTeam","AwayTeam","FTHG","FTAG")
+m_1819$covid = "before"
+m_1920$covid = "before"
+m_2021$covid = "in"
+m_2122$covid = "later"
+
+kept_variables <- c("HomeTeam","AwayTeam","FTHG","FTAG","covid")
 
 Data <- rbind(m_1819[,kept_variables],m_1920[,kept_variables],
               m_2021[,kept_variables],m_2122[,kept_variables])
-Data <- Data %>% mutate_if(is.character,as.factor) %>% mutate(Date = as.Date(Date,format="%d/%m/%Y"))
 
-covid_start = as.Date("2020-03-12", '%Y-%m-%d')
-covid_end = as.Date("2021-01-01", '%Y-%m-%d')
+AwayData <- Data
+AwayData$home = 0
+names(AwayData) <- c("opponent","team","opponent_goals","goals","covid", "home")
 
-Data <- Data %>% mutate('covid' = as.numeric(Date < covid_start)|as.numeric(Date >= covid_end),'FALSE'=TRUE)
 
-Data <- rbind(Data,cbind(Data[ , c("Date","AwayTeam", "HomeTeam", "FTAG", "FTHG","covid")],FALSE))
-Data <- select(Data,Date, HomeTeam, FTHG, covid,'FALSE')
-names(Data) <-  c("Date","Team", "Goals", "Covid", "Home")
+Data$home = 1
+names(Data) <-  c("team","opponent","goals","opponent_goals", "covid", "home")
+
+
+Data <- rbind(Data,AwayData)
 
 str(Data)
 
-table(Data$Home)
+Data <- Data %>% mutate(team=as.factor(team),
+                        opponent = as.factor(opponent),
+                        covid = as.factor(covid),
+                        home = as.factor(home))
 
-View(Data)
+str(Data)
+
+#checking
+cat(table(Data$home))
+cat(table(Data$covid))
+
+table(Data$covid)
 ```
 
 Date = Match Date (dd/mm/yy)
@@ -50,13 +70,21 @@ FTHG = Full Time Home Team Goals
 FTAG = Full Time Away Team Goals
 FTR = Full Time Result (H=Home Win, D=Draw, A=Away Win)
 
+```{r}
+gm_basic <- glm(goals ~ covid + home + home:covid,data=Data,family = poisson(link="log"))
+summary(gm_basic)
+anova(gm_basic,type=2,test="LRT")
+
+gm_team <- glm(goals ~ team + opponent + home + covid + covid:home - 1, data=Data, family=poisson(link="log"))
+
+summary(gm_team)
+```
 
 ```{r}
-gm1 <- glm(Goals ~ Covid + Home,data=Data,family = poisson(link="log"))
-gm2 <- glm(Goals ~ Covid*Home, data=Data, family=poisson(link="log"))
-anova(gm1,gm2,test="LRT")
-
-table(Data$Covid)
-
-summary(gm2)
+confint(gm3)
 ```
+
+
+# Answering the questions
+
+See final report
