@@ -18,6 +18,7 @@ library(tidyverse)
 library(car)
 library(knitr)
 library(kableExtra)
+library(xtable)
 ```
 
 # Introduction
@@ -92,14 +93,22 @@ head(Data) %>% kable(digit=3,caption = "Description of the dataset") %>% kable_s
 
 The Poisson regression is a member of a broad class of models known as the Generalized Linear Models (GLM), with the natural log as canonical link. In a Poisson Regression setting, one can define the problem as follows : 
 $$log(Y_{i,j}) = \beta_1 \cdot H + \beta_2 \cdot C_{in} + \beta_3 \cdot C_{later} + \beta_4 \cdot H *  C_{in} + \beta_5 \cdot H * C_{later} + \beta_6 \cdot T_i + \beta_7 \cdot O_j $$
-where $Y_{i,j}$ is the expected number of goals scored by team $T_i$ against opponent team $O_j$, $H$ is a Boolean indicator saying whether the team $T_i$ plays at home. $C_{in,later}$ are respectively the Covid indicator to know whether the game happened during the covid preriod and afterwards. One notes that the period before Covid is implied by those two factors being equal to zero. $H \cdot  C_{in,later}$ marks the interaction between being at Home and playing during Covid or after covid. One notes that to answer the main question, knowing the teams (variables $T_i$ and $O_j$) would not be necessary. However, after looking at various metrics such as the AIC, BIC and the residual deviance, knowing the team helps us getting more accurate predictions and is therefore kept in our model.
+where $Y_{i,j}$ is the expected number of goals scored by team $T_i$ against opponent team $O_j$, $H$ is a Boolean indicator saying whether the team $T_i$ plays at home. $C_{in,later}$ are respectively the Covid indicator to know whether the game happened during the covid preriod and afterwards. One notes that the period before Covid is implied by those two factors being equal to zero. $H \cdot  C_{in,later}$ marks the interaction between being at Home and playing during Covid or after covid. One notes that to answer the main question, knowing the teams (variables $T_i$ and $O_j$) would not be necessary. However, after looking at various metrics such as the AIC, BIC and the residual deviance, knowing the team helps us getting more accurate predictions and is therefore kept in our model (see [Comparison of models] for more details).
 
-To sum it up, one finds hereunder a table summarizing the coefficients used to predict the expected number of goals for a given situation. One notes that $\beta_{6,7}$ will be used in every 
+To sum it up, one finds hereunder a table summarizing the coefficients used to predict the expected number of goals for a given situation. One notes that $\beta_{6,7}$ will be used in every computation.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
 #             CovidBefore  CovidIn        CovidLater
 # Away         Baseline      b_2               b_3
 # Home          b_1      b_1+b_2+b_4      b_1+b_2+b_5
+
+row1 <- c("Baseline","$\\beta_2$","$\\beta_3$")
+row2 <- c("$\\beta_1$","$\\beta_1+\\beta_2+\\beta_4$","$\\beta_1+\\beta_3+\\beta_5$")
+
+table <- data.frame(rbind(row1,row2))
+names(table) <- c("Before Covid","During Covid","After Covid")
+row.names(table) <- c("Away","Home")
+table %>% kable(digit=3,caption = "Description of the Poisson Regression model ($\\beta_{6,7}$ are ommited)") %>% kable_styling()
 
 ```
 
@@ -108,39 +117,41 @@ In order to apply this model, one has to make some assumptions about the data an
 * We do not make a difference for the coefficients of a given team with respect to each season, therefore a given team will have the same coefficient between 2019 and 2022. One more step would be to make another boolean value with respect to the season or check the betting values to evaluate the strength of a given team with respect to the years, but that is out of the scope of this project.
 * We do not take the relegation or promotion from the Premier League into account. This means that we do not remove those teams and therefore that the coefficients regarding certain teams might not be highly accurate as the number of games played by those relegated/promoted teams might be quite low.
 
-## Assumptions
-In order to apply our model, one has to make some assumptions about the data and what the results will look like:
-
-* We do not make a difference for the coefficients of a given team with respect to each season, therefore Manchester United will have the same coefficient between 2019 and 2022. One more step would be to make another boolean value with respect to the season or check the betting values to evaluate the strength of a given team with respect to the years, but that is out of the scope of this project.
-* We do not take the relegation or promotion from the Premier League into account. This means that we do not remove those teams and therefore that the coefficients regarding certain teams might not be highly accurate as the number of games played by those relegated/promoted teams might be quite low.
-
 ## Model
 
 We can now describe our model :
 
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-prm <- glm(goals ~ team + opponent + home + covid + covid:home - 1, data=Data, family=poisson(link="log"))
+```{r}
+prm <- glm(goals ~ team + opponent + home + covid + covid:home - 1,
+           data=Data, 
+           family=poisson(link="log"))
 ```
 
-As seen above, we have the response `goals` which is the number of goals scored by `team` during a match against `opponent`. Then, we try to predict this response by using the `team` and `opponent` factor, as well as the `covid` and `home` flag previously described. We also add the interaction between `covid` and `home` which enables us to more precisely describe the link between the home effect and whether the game was played before, during or after covid.
+As seen above, we have the response `goals` which is the number of goals scored by `team` during a match against `opponent`. Then, we try to predict this response by using the `team` and `opponent` factor, as well as the `covid` and `home` flag previously described. We also add the interaction between `covid` and `home` which enables us to more precisely describe the link between the home effect and whether the game was played before, during or after Covid. One notes that we removed any intercept in the model and when comparing this model with some without any intercept and teams, we see that the teams' coefficients are the one containing this information, and that the coefficients for home and Covid stay the same, which is a good stability property (this can be seen in [Comparison of models]).
+
+The main result from Poisson Regression theory that will be used afterwards is related to the marginal effect of a given variable, meaning that having a look at the coefficients $\beta$, we help us understand the proportional change in expected frequency. If we let $x=(x_1,...,x_p)^T$ and $\tilde{x}(j)=(x_1,...,x_{j−1},x_j+1,x_{j+1},...,x_p)^T$, then $\exp(\beta_j) = \frac{\mathbb{E}[Y_n |X_n = \tilde{x}(j)]}{\mathbb{E}[Y_n|X_n=x]}$, meaning that $\exp(\beta_j)$ is the expected change in the response when the j-th variable increases by one. This is particularly interesting when looking at our factors `home` and `covid` and their interactions as computing the exponential of their respective coefficients will give us insight about how the number of expected goals change when those factors are equal to zero or one.
 
 # Did home advantage persist through Covid?
 
-To answer this question, we will answer four subsidiary questions to grasp the home advantage phenomenon a bit better:
+Now that we have a model which enables us to understand how the number of expected goals react to the teams playing, whether before, during or after covid, at home or away, we can tackle the main part of this project. To answer the main question, we will answer four subsidiary questions to grasp the home advantage phenomenon a bit better:
 
 * Was there home advantage before Covid?
 * Did home advantage reduced during Covid?
 * How did it evolved after Covid?
 * What are the confidence intervals of those evolutions?
 
-## Was there a home advantage before Covid?
+To answer those questions, one can have a look at the summary of the model which can be found in full here : [Summary of the model] and in a simplified version below:
 
 ```{r,echo=FALSE,warning=FALSE,message=FALSE}
-summary(prm)
+sum <- summary(prm)
+sum_fact <- sum$coefficients[52:56,] 
+row.names(sum_fact) <- c("$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$","$\\beta_5$")
+sum_fact %>% kable(digit=3,caption = "Summary of interesting factors") %>% kable_styling()
 ```
 
-To statistically answer this question, one needs to take a look at the coefficients in front of the `home` variable. As the baseline factor for covid is `before`, one finds that the home effect before covid will be $exp(\beta_1)=1.21$. This means that when a team is playing at home, it gets $1.21$ times more goals than when playing away, all other parameters being equal (marginal effect) before covid hits.
+## Was there a home advantage before Covid?
 
+To statistically answer this question, one needs to take a look at the coefficients in front of the `home` variable. As the baseline factor for Covid is `before`, one finds that the home effect before Covid will be $exp(\beta_1)=1.21$. This means that when a team is playing at home, it gets $1.21$ times more goals than when playing away, all other parameters being equal (marginal effect) before Covid hits. The answer to the question is therefore affirmative, and by a large margin.
 
 ## Did home advantage reduced during Covid?
 
@@ -165,13 +176,22 @@ Insert table
 
 # Appendix
 
-## Full summary of the final model
+## Summary of the model
 
-## Comparison model with and without teams
+```{r}
+
+#summary(prm) %>% kable(digit=3,caption = "Summary of the model") %>% kable_styling()
+
+```
+
+
+## Comparison of models
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
 
 prm_wo_teams <- glm(goals ~ home + covid + covid:home - 1, data=Data, family=poisson(link="log"))
+prm_wo_teams_inter <- glm(goals ~ home + covid + covid:home, data=Data, family=poisson(link="log"))
+
 
 print(paste0("Without team AIC: ", AIC(prm_wo_teams))) # AIC: 8597.7
 print(paste0("With team AIC: ", AIC(prm))) # AIC: 8597.7
@@ -181,5 +201,9 @@ print(paste0("Without team BIC: ", BIC(prm_wo_teams))) # 8633.309
 print(paste0("With team BIC: ", BIC(prm))) # 8480.303
 
 anova(prm,prm_wo_teams) # deviance : -549.88
+
+summary(prm_wo_teams_inter)
+
+summary(prm)
 
 ```
