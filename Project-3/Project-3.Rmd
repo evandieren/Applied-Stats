@@ -18,7 +18,8 @@ library(tidyverse)
 library(car)
 library(knitr)
 library(kableExtra)
-library(xtable)
+library(jtools)
+library(pROC)
 ```
 
 # Introduction
@@ -47,7 +48,7 @@ Once this is done, one has to duplicate each game to take it from each team's pe
 * `team` = Studied Team
 * `opponent` = Opponent Team
 * `goals` = Number of goals scored by the studied team
-* `opponent_goals` = Number of goals scored by the opponent team (not used in the model but kept for completeness)
+* `opponent_goals` = Number of goals scored by the opponent team (not used in the model but kept for additional study, see [Draw effect])
 * `covid` = factor representing whether the game between `team` and `opponent` was played before, during or after covid
 * `home` = factor representing whether `team` played at home or not.
 
@@ -93,7 +94,7 @@ head(Data) %>% kable(digit=3,caption = "Description of the dataset") %>% kable_s
 
 The Poisson regression is a member of a broad class of models known as the Generalized Linear Models (GLM), with the natural log as canonical link. In a Poisson Regression setting, one can define the problem as follows : 
 $$log(Y_{i,j}) = \beta_1 \cdot H + \beta_2 \cdot C_{in} + \beta_3 \cdot C_{later} + \beta_4 \cdot H *  C_{in} + \beta_5 \cdot H * C_{later} + \beta_6 \cdot T_i + \beta_7 \cdot O_j $$
-where $Y_{i,j}$ is the expected number of goals scored by team $T_i$ against opponent team $O_j$, $H$ is a Boolean indicator saying whether the team $T_i$ plays at home. $C_{in,later}$ are respectively the Covid indicator to know whether the game happened during the covid preriod and afterwards. One notes that the period before Covid is implied by those two factors being equal to zero. $H \cdot  C_{in,later}$ marks the interaction between being at Home and playing during Covid or after covid. One notes that to answer the main question, knowing the teams (variables $T_i$ and $O_j$) would not be necessary. However, after looking at various metrics such as the AIC, BIC and the residual deviance, knowing the team helps us getting more accurate predictions and is therefore kept in our model (see [Comparison of models] for more details).
+where $Y_{i,j}$ is the expected number of goals scored by team $T_i$ against opponent team $O_j$, $H$ is a Boolean indicator saying whether the team $T_i$ plays at home. $C_{in,later}$ are respectively the Covid indicator to know whether the game happened during the covid preriod and afterwards. One notes that the period before Covid is implied by those two factors being equal to zero. $H \cdot  C_{in,later}$ marks the interaction between being at Home and playing during Covid or after covid. One notes that to answer the main question, knowing the teams (variables $T_i$ and $O_j$) would not be necessary. However, after looking at various metrics such as the AIC, BIC, AUC and the residual deviance, knowing the team helps us getting more accurate predictions and is therefore kept in our model (see [Comparison of models] for more details).
 
 To sum it up, one finds hereunder a table summarizing the coefficients used to predict the expected number of goals for a given situation. One notes that $\beta_{6,7}$ will be used in every computation.
 
@@ -139,7 +140,7 @@ Now that we have a model which enables us to understand how the number of expect
 * Did home advantage reduced during Covid?
 * How did it evolved after Covid?
 
-To answer those questions, one can have a look at the summary of the model which can be found in full here : [Summary of the model] and in a simplified version below:
+To answer those questions, one can have a look at the coefficients of the model which can be found in full here : [Coefficients and CIs of the model] and in a simplified version below:
 
 ```{r,echo=FALSE,warning=FALSE,message=FALSE}
 sum <- summary(prm)
@@ -168,8 +169,9 @@ To tackle this question, one can have a look at the interaction between the `hom
 
 After Covid, we can check the coefficient of `home:CovidLater` which is equal to $\beta_5 = -0.05$, meaning that there will be a slight decrease of the home effect after Covid hits, but it does not cancels as during the Covid lockdowns. Quantitatively, the home advantage after Covid is equal to $\exp(0.194-0.05) = 1.15$, meaning that there is on average a $15%$ increase of number of expected goals after Covid due to home effect. However, when looking at the CIs,  things get a little more tricky. In fact, we observe that the home effect after Covid hits gets a multiplicative factor ranging from $0.82$ to $1.11$ which means that in reality, with this $95\%$ confidence level, one can not conclude whether there was an increase or a decrease of the home effect after Covid hit with respect to its value before Covid.
 
+## Answering the main question
 
-To wrap it up for this section, we can conclude that the Covid wave had a negative effect on the existing home advantage. When looking at the estimates of the coefficients, it even totally cancels the home effect during the lockdown period. After covid, we saw on average a slight decrease from pre-covid levels but the home advantage was back, even if we have to take those results with a grain of salt due to the confidence intervals' values.
+To wrap it up for this section, we can conclude that the Covid period had a negative effect on the previously existing home advantage. When looking at the estimates of the coefficients, it nearly cancels the home effect during the lockdown period. After covid, we saw on average a slight decrease from pre-covid levels but the home advantage was back, even if we have to take those results with a grain of salt due to the confidence intervals' values.
 
 
 # Additional studies
@@ -193,28 +195,9 @@ Data %>% mutate_if(is.factor,as.numeric) %>%
 
 At first glance, we observe a pretty flat residuals for all the variables which were used in our prediciton, which is a good sign. We also observe a few bigger residuals when playing during covid. There are also some teams and opponents which have higher residuals than other, as seen above.
 
-## What happens if we remove the imbalanced season (19-20)
-```{r}
-start1 <- 381
-end1 <- 640
-start2 <- start1+1400
-end2 <- end1+1400
-indices <- c(start1:end1,start2:end2)
-Data_wo1920 <- Data[-indices,]
-
-prm_wo1920 <- glm(goals ~ team + opponent + home + covid + covid:home - 1,
-                  data=Data_wo1920, 
-                  family=poisson(link="log"))
-
-sum_wo1920 <- summary(prm_wo1920)
-sum_fact_wo1920 <- sum_wo1920$coefficients[52:56,] 
-row.names(sum_fact_wo1920) <- c("$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$","$\\beta_5$")
-sum_fact_wo1920 %>% kable(digit=3,caption = "Estimations of coefficients for interesting factors - without 2019-2020") %>% kable_styling()
-
-```
-
-Unsurprisingly, 
 ## Larger model
+
+In this sub-section, we check whether there is a significant difference between our simple model and the biggest model possible (excluding interactions) with the given data. To do so, we only keep the columns which are in the four seasons' datasets and then train the model by adding the interaction between home and Covid. The model is shown hereunder, as well as the estimates and CIs of the interesting factors:
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
 cols <- intersect(intersect(intersect(names(m_1819), names(m_1920)),names(m_2021)),names(m_2122))
@@ -283,10 +266,24 @@ full_data <- full_data %>% mutate(result = as.factor(result),
                                   opponent = as.factor(opponent),
                                   covid = as.factor(covid),
                                   home = as.factor(home))
+```
 
-full_prm <- glm(goals ~ . + home:covid, data=full_data, family=poisson(link="log"))
 
-anova(full_prm,prm) # way better model for prediction
+```{r}
+full_prm <- glm(goals ~ team + opponent + opponent_goals + result + ht_goals + 
+                ht_opponent_goals + ht_result + Referee + team_shots + opponent_shots + 
+                team_shots_on_target + opponent_shots_on_target + team_fouls + 
+                opponent_fouls + team_corners + opponent_corners + team_yellow + 
+                opponent_yellow + team_red + opponent_red + B365H + B365D + 
+                B365A + BWH + BWD + BWA + IWH + IWD + IWA + PSH + PSD + PSA + 
+                WHH + WHD + WHA + VCH + VCD + VCA + PSCH + PSCD + PSCA + 
+                covid + home + home:covid - 1,
+                data=full_data,
+                family=poisson(link="log"))
+```
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+#anova(full_prm,prm) # way less residual deviance but not that much for AUC eval
 
 sum_full <- summary(full_prm)
 covidin <- sum_full$coefficients[120,]
@@ -295,24 +292,69 @@ home1 <- sum_full$coefficients[122,]
 covidin_home1 <- sum_full$coefficients[123,]
 covidlater_home1 <- sum_full$coefficients[124,]
 
-sum_full_fact <- rbind(home1,covidin,covidlater,covidin_home1,covidlater_home1)
+full_sum_fact <- rbind(home1,covidin,covidlater,covidin_home1,covidlater_home1)
 
-row.names(sum_full_fact) <- c("$\\beta_1^{full}$","$\\beta_2^{full}$","$\\beta_3^{full}$","$\\beta_4^{full}$","$\\beta_5^{full}$")
-sum_full_fact %>% kable(digit=3,caption = "Estimations of coefficients for interesting factors - full model") %>% kable_styling()
+full_conf_int <- confint(full_prm,parm=c("home1","covidin","covidlater",
+                                         "covidin:home1","covidlater:home1"))
+
+row.names(full_sum_fact) <- c("$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$","$\\beta_5$")
+
+full_sum_fact <- cbind(full_sum_fact,full_conf_int)
+
+full_sum_fact %>% kable(digit=3,caption = "Estimations of coefficients for interesting factors - full model") %>% kable_styling()
 ```
+
+Fortunately, when comparing the obtained estimates and CIs for the biggest model to the one used in our project, we find similar results. One small variation is the estimate of the home effect before covid which goes from $21\%$ to $14\%$. Other than that, we obtain the same negative effect of the Covid lockdown on the home effect with negative CIs and also a mixed answer for the home advantage after Covid when looking at the CIs (both negative and positive).
+
+## Draw effect
+
+The last additional study that we wanted to share was whether the game finishing in a draw would affect the home advantage when playing before, during or after Covid lockdowns. To do so, we changed the dataset by adding a `draw` flag and added this flag and its interaction with `home` to the Poisson regression model, which gives the following model :
+
+$$log(Y_{i,j}) = \beta_1 \cdot H + \beta_2 \cdot C_{in} + \beta_3 \cdot C_{later} +\beta_4 \cdot D+ \beta_5 \cdot H *  C_{in} + \beta_6 \cdot H * C_{later} + \beta_7 \cdot H*D +\beta_8 \cdot T_i + \beta_9 \cdot O_j $$
+where $D$ is the flag whether there is a draw or not during the match.
+
+Below are the coefficients and their respective CIs from the new model :
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
-full_conf_int <- confint(full_prm,parm=c("home1","covidin","covidlater","covidin:home1","covidlater:home1"))
-row.names(full_conf_int) <- c("$\\beta_1^{full}$","$\\beta_2^{full}$","$\\beta_3^{full}$","$\\beta_4^{full}$","$\\beta_5^{full}$")
-full_conf_int %>% kable(digit=3,caption = "Confidence intervals for the coefficients") %>% kable_styling()
+Data_draw <- Data
+
+Data_draw$draw <- Data_draw$goals == Data_draw$opponent_goals
+
+Data_draw <- Data_draw %>% mutate(draw = as.factor(draw))
+
+draw_prm <- glm(goals ~ team + opponent + home+covid + draw + home:covid + home:draw - 1,
+                        data=Data_draw, 
+                        family=poisson(link="log"))
+draw_sum <- summary(draw_prm)
+
+draw_sum_coef <- draw_sum$coefficients[52:58,]
+
+draw_conf_int <- confint(draw_prm,parm = c("home1","covidin","covidlater","drawTRUE",
+                                           "home1:covidin","home1:covidlater",
+                                           "home1:drawTRUE"))
+
+draw_sum_coef <- cbind(draw_sum_coef,draw_conf_int)
+
+row.names(draw_sum_coef) <- c("$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$",
+                              "$\\beta_5$","$\\beta_6$","$\\beta_7$")
+
+draw_sum_coef %>% 
+  kable(digit=3,caption = "Estimations of coefficients for interesting factors - draw model") %>% 
+  kable_styling()
 ```
+As seen above, we observe that the draw effect has overall negative impact on the number of expected goals. When playing at home, the home advantage is reduced on average by $10\%$ when there is a draw, but when looking at the CIs, it can range from a $24\%$ decrease to an increase of $7\%$
+
+Even though this is an interesting point, one could think that there might be a problem here, meaning that the snake is biting its own tail. If we go back to the definition of the Home Advantage, it states that a given team might score more goals than playing away, and therefore on average win more games when playing at home. This means that the draw might be a consequence of the home effect, and therefore studying the home effect change from a draw effect point of view might be problematic.
 
 # Conclusion
 
+To conclude, we created a Poisson regression model to answer a main question : Did home advantage persist through Covid? To answer this question in more detail, we divided it into three sub-questions. Firstly, we showed that the home effect was indeed present in the English Premier League during both $2018-2019$ and $2019-2020$ season which was just before the Covid lockdowns. Secondly, we verified statistically that there was a negative effect from the lockdowns to the home effect, which nearly canceled it during the $2020-2021$ season. Lastly, we obtained mixed results for the period after Covid, where we did not know whether the home effect was reduced or increased due to too wide CIs. A possible remedy would be to gather more data after the $2021-2022$ season to tighten those confidence intervals. Additionnaly, we looked at the residuals of our model, then compared the obtained results to a bigger model from which we fortunately obtained similar results. Latsly, we studied the draw effect but got stuck with an interpretation problem which is yet to be solved.
+
+The next steps would be to do a deeper analysis on this draw effect, and potentieally a similar analysis on the number of red or yellow cards which were given before, during and after Covid to see whether a home advantage was also significant regarding referee's decisions.
 
 # Appendix
 
-## Summary of the model
+## Coefficients and CIs of the model
 
 ```{r,echo=FALSE,warning=FALSE,message=FALSE}
 tot_sum <- summary(prm)$coefficients
@@ -327,10 +369,24 @@ tot_sum %>% kable(digit=3,caption = "Estimations of coefficients for all factors
 ## Comparison of models
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
+AUC_eval <- function(gmodel,Data){
+  set.seed(517)
+  Folds <- matrix(sample(1:dim(Data)[1]), ncol=5)
+  AUC <- rep(0,5)
+  for(k in 1:5){
+    train <- Data[-Folds[,k],]
+    test <- Data[Folds[,k],]
+    my_gm <- glm(gmodel$formula, family="poisson", data=train)
+    test_pred <- predict(my_gm, newdata = test, type="response")
+    AUC[k] <- auc(test$goals,test_pred)
+}
+  return(mean(AUC))
+}
 
 prm_wo_teams <- glm(goals ~ home + covid + covid:home - 1, data=Data, family=poisson(link="log"))
-prm_wo_teams_inter <- glm(goals ~ home + covid + covid:home, data=Data, family=poisson(link="log"))
 
+print(paste0("Without team AUC: ", AUC_eval(prm_wo_teams,Data))) # 0.52
+print(paste0("With team AUC: ", AUC_eval(prm,Data))) # 0.569
 
 print(paste0("Without team AIC: ", AIC(prm_wo_teams))) # AIC: 8597.7
 print(paste0("With team AIC: ", AIC(prm))) # AIC: 8597.7
@@ -340,9 +396,4 @@ print(paste0("Without team BIC: ", BIC(prm_wo_teams))) # 8633.309
 print(paste0("With team BIC: ", BIC(prm))) # 8480.303
 
 anova(prm,prm_wo_teams) # deviance : -549.88
-
-summary(prm_wo_teams_inter)
-
-summary(prm)
-
 ```
