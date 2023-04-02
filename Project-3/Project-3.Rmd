@@ -18,39 +18,38 @@ library(tidyverse)
 library(car)
 library(knitr)
 library(kableExtra)
-library(jtools)
 library(pROC)
 ```
 
 # Introduction
 
-In various sports, one defines the Home effect as the phenomenon whereby the home team gains a significant advantage against its opponent simply by playing at home, in a stadium being crowded by their supporters. Football makes no exception and it has been showed that the home effect is a robust phenomenon in European Leagues. In this project, we focus on the home effect in the English Premier League during Covid pandemic where the games were played behind closed door for $18$ months. One can therefore assess whether the home advantage persisted even though the supporters were not allowed in the stadiums anymore. Thanks to data gathered from all games between $2018$ and $2022$, one can compare the expected number of goals before, during and after covid as well, which helps understanding the home effect on football games. We summarize the contribution of this project by asking ourselves a single question : did home advantage persist through Covid?
+In various sports, one defines the home effect as the phenomenon whereby the home team gains a significant advantage against its opponent simply by playing at home, in a stadium being crowded by their supporters. Football makes no exception and it has been showed that the home effect is a robust phenomenon in European Leagues. In this project, we focus on the home effect in the English Premier League during Covid pandemic where the games were played behind closed door for $18$ months. One can therefore assess whether the home advantage persisted even though the supporters were not allowed in the stadiums anymore. Thanks to data gathered from all games between $2018$ and $2022$ in the EPL, one can compare the expected number of goals before, during and after covid as well, which helps understanding the home effect on football games. We summarize the contribution of this project by asking ourselves a single question : did home advantage persist through Covid?
 
-In this project, we first start by exploring the given dataset, by describing its columns and by wrangling it to get better features to answer the main question. Secondly, we start looking at the Poisson Regression model which is used to model the expected number of goals and state various assumptions used in this project. Thirdly, we can answer the main question by having a look at the coefficients of various variables from our model and give interpretable confidence intervals for the quantities of interest (QoI). Lastly, we explore various stability studies and then conclude on the main results and next steps. 
+In this project, we first start by exploring the given dataset, by describing its variables and by wrangling it to get better features to answer the main question. Secondly, we start looking at the Poisson Regression model which is used to model the expected number of goals and state various assumptions used in this project. Thirdly, we answer the main question by having a look at the coefficients of various variables from our model and give interpretable confidence intervals for the quantities of interest (QoI). Lastly, we explore various additional studies and then conclude on the main results and next steps. 
 
 # Data exploration
 
 ## Dataset Description
 
-The studied [dataset](http://www.football-data.co.uk/matches.php) contains a list of EPL games from various seasons, with QoI such as number of goals from the home and away team, the number of off-sides, yellow and red cards, etc. In this project, we selected four seasons : $18-19,19-20,20-21$ and $20-22$. Hereunder is a list of variables used in this project:
+The studied [dataset](http://www.football-data.co.uk/matches.php) contains a list of EPL games from various seasons, with QoI such as number of goals from the home and away team, the number of strikes, yellow and red cards, etc. In this project, we selected four seasons : $18-19,19-20,20-21$ and $20-22$. Hereunder is a list of variables used to answer the home advantage question:
 
-* `HomeTeam` = Home Team
-* `AwayTeam` = Away Team
-* `FTHG` = Full Time Home Team Goals
-* `FTAG` = Full Time Away Team Goals
+* `HomeTeam`: Home Team
+* `AwayTeam`: Away Team
+* `FTHG`: Full Time Home Team Goals
+* `FTAG`: Full Time Away Team Goals
 
 ## Dataset transformations
 
-The first transformation made to the dataset is to create a factor `covid` which can take three different values : `before`, `in` and `later` which respectively represent the period before, during and after Covid. In our case, as the $19-20$ season only has the games played before the Covid breakthrough, we flagged both $18-19$ and $19-20$ seasons as `before`, the $20-21$ season as `in` and the $21-22$ season as `later`.
+The first transformation made to the dataset is to create a factor `covid` which can take three different values : `before`, `in` and `later`, which respectively represent the period before, during and after Covid. In our case, as the $19-20$ season only has the games played before the Covid breakthrough, we flagged both $18-19$ and $19-20$ seasons as `before`, the $20-21$ season as `in` and the $21-22$ season as `later`.
 
 Once this is done, one has to duplicate each game to take it from each team's perspective, i.e. that for a given team, we will store its name, its opponent's, the number of goals scored by each team, a flag for Covid and another one to know whether the given team played at home. This means that we have a final dataset with the columns described below:
 
-* `team` = Studied Team
-* `opponent` = Opponent Team
-* `goals` = Number of goals scored by the studied team
-* `opponent_goals` = Number of goals scored by the opponent team (not used in the model but kept for additional study, see [Draw effect])
-* `covid` = factor representing whether the game between `team` and `opponent` was played before, during or after covid
-* `home` = factor representing whether `team` played at home or not.
+* `team`:  Studied Team
+* `opponent`: Opponent Team
+* `goals`: Number of goals scored by the studied team
+* `opponent_goals`: Number of goals scored by the opponent team (not used in the model but kept for additional study, see [Draw effect])
+* `covid`: factor representing whether the game between `team` and `opponent` was played before, during or after covid
+* `home`: factor representing whether the studied team played at home or not.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
 m_1819 <- read.csv("Premier_League/2018-2019.csv")
@@ -72,7 +71,6 @@ AwayData <- Data
 AwayData$home = 0
 names(AwayData) <- c("opponent","team","opponent_goals","goals","covid", "home")
 
-
 Data$home = 1
 names(Data) <-  c("team","opponent","goals","opponent_goals", "covid", "home")
 
@@ -84,43 +82,35 @@ Data <- Data %>% mutate(team=as.factor(team),
                         covid = as.factor(covid),
                         home = as.factor(home))
 
-head(Data) %>% kable(digit=3,caption = "Description of the dataset") %>% kable_styling()
-
-# $$log(Y_{i,j}) = \beta_1 \cdot H + \beta_2 \cdot C_{before} + \beta_3 \cdot C_{In} + \beta_4 \cdot C_{later} + \beta_3 \cdot H *  C + \beta_4 \cdot T_i + \beta_5 \cdot O_j $$
+head(Data) %>% kable(digit=3,caption = "First rows of the final dataset") %>% kable_styling()
 ```
 
 
 # Poisson Regression model
 
-The Poisson regression is a member of a broad class of models known as the Generalized Linear Models (GLM), with the natural log as canonical link. In a Poisson Regression setting, one can define the problem as follows : 
+The Poisson regression model is a member of a broad class of models known as the Generalized Linear Models (GLM), with the natural log as canonical link. In a Poisson Regression setting, one can define the problem as follows : 
 $$log(Y_{i,j}) = \beta_1 \cdot H + \beta_2 \cdot C_{in} + \beta_3 \cdot C_{later} + \beta_4 \cdot H *  C_{in} + \beta_5 \cdot H * C_{later} + \beta_6 \cdot T_i + \beta_7 \cdot O_j $$
-where $Y_{i,j}$ is the expected number of goals scored by team $T_i$ against opponent team $O_j$, $H$ is a Boolean indicator saying whether the team $T_i$ plays at home. $C_{in,later}$ are respectively the Covid indicator to know whether the game happened during the covid preriod and afterwards. One notes that the period before Covid is implied by those two factors being equal to zero. $H \cdot  C_{in,later}$ marks the interaction between being at Home and playing during Covid or after covid. One notes that to answer the main question, knowing the teams (variables $T_i$ and $O_j$) would not be necessary. However, after looking at various metrics such as the AIC, BIC, AUC and the residual deviance, knowing the team helps us getting more accurate predictions and is therefore kept in our model (see [Comparison of models] for more details).
+where $Y_{i,j}$ is the expected number of goals scored by team $T_i$ against opponent team $O_j$, $H$ is an indicator representing whether the team $T_i$ plays at home or away. $C_{in,later}$ are the Covid indicator to know whether the game happened during the covid preriod and afterwards, respectively. One notes that the period before Covid is implied by those two indicators being equal to zero. $H * C_{in,later}$ marks the interaction between being at Home and playing during Covid or after Covid. One notes that to answer the main question, knowing the teams (variables $T_i$ and $O_j$) would not be necessary. However, after looking at various metrics such as the AIC, BIC, AUC and the residual deviance, knowing the team helps us getting more accurate predictions and is therefore kept in our model (see [Comparison of models] for more details).
 
-To sum it up, one finds hereunder a table summarizing the coefficients used to predict the expected number of goals for a given situation. One notes that $\beta_{6,7}$ will be used in every computation.
+To check the interpretation and the completeness of the model, one finds below a table summarizing the coefficients used to predict the expected number of goals for a given situation. One notes that $\beta_{6,7}$ will be used in every computation and are therefore omited.
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
-#             CovidBefore  CovidIn        CovidLater
-# Away         Baseline      b_2               b_3
-# Home          b_1      b_1+b_2+b_4      b_1+b_2+b_5
-
-row1 <- c("Baseline","$\\beta_2$","$\\beta_3$")
-row2 <- c("$\\beta_1$","$\\beta_1+\\beta_2+\\beta_4$","$\\beta_1+\\beta_3+\\beta_5$")
-
-table <- data.frame(rbind(row1,row2))
+table <- data.frame(rbind(c("Baseline","$\\beta_2$","$\\beta_3$"),
+                          c("$\\beta_1$","$\\beta_1+\\beta_2+\\beta_4$","$\\beta_1+\\beta_3+\\beta_5$")))
 names(table) <- c("Before Covid","During Covid","After Covid")
 row.names(table) <- c("Away","Home")
-table %>% kable(digit=3,caption = "Description of the Poisson Regression model ($\\beta_{6,7}$ are ommited)") %>% kable_styling()
+table %>% kable(digit=3,caption = "Description of the Poisson Regression model ($\\beta_{6,7}$ are omited)") %>% kable_styling()
 
 ```
 
-In order to apply this model, one has to make some assumptions about the data and what the results will look like:
+In order to use this model properly, one has to make some assumptions:
 
 * We do not make a difference for the coefficients of a given team with respect to each season, therefore a given team will have the same coefficient between 2019 and 2022. One more step would be to make another boolean value with respect to the season or check the betting values to evaluate the strength of a given team with respect to the years, but that is out of the scope of this project.
-* We do not take the relegation or promotion from the Premier League into account. This means that we do not remove those teams and therefore that the coefficients regarding certain teams might not be highly accurate as the number of games played by those relegated/promoted teams might be quite low.
+* We do not take the relegation or promotion from the Premier League into account. This means that we do not remove those teams and therefore that the coefficients regarding certain teams might not be highly accurate as the number of games played by those relegated/promoted teams might be quite low, especially as we are only looking at four seasons of the EPL.
 
 ## Model
 
-We can now describe our model :
+We can now describe our model as below:
 
 ```{r}
 prm <- glm(goals ~ team + opponent + home + covid + covid:home - 1,
@@ -128,13 +118,13 @@ prm <- glm(goals ~ team + opponent + home + covid + covid:home - 1,
            family=poisson(link="log"))
 ```
 
-As seen above, we have the response `goals` which is the number of goals scored by `team` during a match against `opponent`. Then, we try to predict this response by using the `team` and `opponent` factor, as well as the `covid` and `home` flag previously described. We also add the interaction between `covid` and `home` which enables us to more precisely describe the link between the home effect and whether the game was played before, during or after Covid. One notes that we removed any intercept in the model and when comparing this model with some without any intercept and teams, we see that the teams' coefficients are the one containing this information, and that the coefficients for home and Covid stay the same, which is a good stability property (this can be seen in [Comparison of models]).
+As seen above, we have the response `goals` which is the number of goals scored by `team` during a match against `opponent`. Then, we try to predict this response by using the `team` and `opponent` factor, as well as the `covid` and `home` indicators previously described. We also add the interaction between `covid` and `home` which enables us to more precisely describe the link between the home effect and whether the game was played before, during or after Covid. One notes that we removed any intercept in the model and when comparing this model with some with an intercept but without the team's indicators, we see that the teams' coefficients are the one containing this information, and that the coefficients for home and Covid stay approximately the same, which is a good stability property (this can be seen in [Comparison of models]).
 
 The main result from Poisson Regression theory that will be used afterwards is related to the marginal effect of a given variable, meaning that having a look at the coefficients $\beta$, we help us understand the proportional change in expected frequency. If we let $x=(x_1,...,x_p)^T$ and $\tilde{x}(j)=(x_1,...,x_{j−1},x_j+1,x_{j+1},...,x_p)^T$, then $\exp(\beta_j) = \frac{\mathbb{E}[Y_n |X_n = \tilde{x}(j)]}{\mathbb{E}[Y_n|X_n=x]}$, meaning that $\exp(\beta_j)$ is the expected change in the response when the j-th variable increases by one. This is particularly interesting when looking at our factors `home` and `covid` and their interactions as computing the exponential of their respective coefficients will give us insight about how the number of expected goals change when those factors are equal to zero or one.
 
 # Did home advantage persist through Covid?
 
-Now that we have a model which enables us to understand how the number of expected goals react to the teams playing, whether before, during or after covid, at home or away, we can tackle the main part of this project. To answer the main question, we will answer three subsidiary questions to grasp the home advantage phenomenon a bit better:
+Now that we have a model which enables us to understand how the number of expected goals evolves with respect to the teams playing, whether before, during or after covid, at home or away, we can tackle the main part of this project. To answer the main question, we will answer three subsidiary questions to grasp the home advantage phenomenon a bit better:
 
 * Was there home advantage before Covid?
 * Did home advantage reduced during Covid?
@@ -155,31 +145,31 @@ sum_fact <- cbind(sum_fact,conf_int)
 sum_fact %>% kable(digit=3,caption = "Estimations of coefficients for interesting factors") %>% kable_styling()
 ```
 
-We also computed confidence intervals which help us know whether there is a large variance on those estimates, which might blur the results and decrease the confidence we would have in the estimate itself and the consequences of their values. To do so, one can compute confidence intervals for each of the coefficients used, mainly $\beta_{1:5}$ using the `confint` R command. One notes that this command returns the Profile Likelihood CIs, and not the Wald which can be computed using `confint.default` but assumes normality.
+We also computed confidence intervals which help us assess whether there is a large variance on those estimates, which might blur the results and decrease the confidence we would have in the estimate itself and the consequences of their values. To do so, one can compute confidence intervals for each of the coefficients used, mainly $\beta_{1:5}$ using the `confint` R command. One notes that this command returns the Profile Likelihood CIs, and not the Wald's which can be computed using `confint.default` but assumes normality.
 
 ## Was there a home advantage before Covid?
 
-To statistically answer this question, one needs to take a look at the coefficients in front of the `home` variable. As the baseline factor for Covid is `before`, one finds that the home effect before Covid will be approximately $\exp(\beta_1)=1.21$. This means that, on average, when a team is playing at home, it gets $21\%$ times more goals than when playing away, all other parameters being equal before Covid hits. When looking at the $95\%$ confidence interval, we see that playing at home before covid indeed gives the team a positive effect, as the lower and upper bound are positive. Namely, we get that the home effect is between $10\%$ and $33\%$ with a $95\%$ confidence interval.
+To statistically answer this question, one needs to take a look at the coefficients in front of the `home` variable. As the baseline factor for Covid is `before`, one finds that the home effect before Covid will be approximately $\exp(\beta_1)=1.21$. This means that, on average, when a team is playing at home, it gets $21\%$ times more goals than when playing away, all other parameters being equal before Covid hits. When looking at the $95\%$ confidence interval, we see that playing at home before Covid indeed gives the team a positive effect, as the lower and upper bound are both positive. Namely, we get that the home effect is between $10\%$ and $33\%$ with a $95\%$ confidence interval.
 
 ## Did home advantage reduced during Covid?
 
-To tackle this question, one can have a look at the interaction between the `home` and the `covidIn` flag. By using the same strategy as the previous question, we can simply sum the coefficients of `home` and `home:covidIn` which will give us the coefficient of the home advantage during Covid. One finds $\exp(\beta_1 + \beta_4) = \exp(0.194 + -0.187) = 1.01$, meaning that on average during Covid, the home advantage has nearly no impact on the expected goals, as playing at home will only increase the number of goals by $1\%$, which is highly reduced from before Covid ($21\%$). When looking at the CIs, we observe that both upper and lower bounds of the interaction between `home` and `covidIn` are negative, which shows that there is a reduction of the home effect during the lock-down period. More precisely, we get a reduction of the home effect between $3\%$ and $28%$.
+To tackle this question, one can have a look at the interaction between the `home` and the `covidIn` flag. By using the same strategy as the previous question, we can simply sum the coefficients of `home` and `home:covidIn` which will give us the coefficient of the home advantage during Covid. One finds $\exp(\beta_1 + \beta_4) = \exp(0.194 + -0.187) = 1.01$, meaning that on average during Covid, the home advantage has nearly no impact on the expected goals, as playing at home will only increase the number of goals by $1\%$, which is highly reduced from before Covid ($21\%$). When looking at the CIs, we observe that both upper and lower bounds of the interaction between `home` and `covidIn` are negative, which shows that there is a reduction of the home effect during the lock-down period at a $95\%$ confidence level. More precisely, we get a reduction of the home effect between $3\%$ and $28%$.
 
 ## How did it evolved after Covid? 
 
-After Covid, we can check the coefficient of `home:CovidLater` which is equal to $\beta_5 = -0.05$, meaning that there will be a slight decrease of the home effect after Covid hits, but it does not cancels as during the Covid lockdowns. Quantitatively, the home advantage after Covid is equal to $\exp(0.194-0.05) = 1.15$, meaning that there is on average a $15%$ increase of number of expected goals after Covid due to home effect. However, when looking at the CIs,  things get a little more tricky. In fact, we observe that the home effect after Covid hits gets a multiplicative factor ranging from $0.82$ to $1.11$ which means that in reality, with this $95\%$ confidence level, one can not conclude whether there was an increase or a decrease of the home effect after Covid hit with respect to its value before Covid.
+After Covid, one sees that the coefficient of `home:CovidLater` is equal to $\beta_5 = -0.05$, meaning that there will be a slight decrease of the home effect after Covid hits, but it does not cancels as during the Covid lockdowns. Quantitatively, the home advantage after Covid is equal to $\exp(0.194-0.05) = 1.15$, meaning that there is on average a $15%$ increase of number of expected goals after Covid due to home effect. However, when looking at the CIs,  things get a little more tricky. In fact, we observe that the home effect after Covid hits gets a multiplicative factor ranging from $0.82$ to $1.11$ which means that in reality, at this $95\%$ confidence level, one can not conclude whether there was an increase or a decrease of the home effect after Covid hit with respect to its value before Covid.
 
 ## Answering the main question
 
-To wrap it up for this section, we can conclude that the Covid period had a negative effect on the previously existing home advantage. When looking at the estimates of the coefficients, it nearly cancels the home effect during the lockdown period. After covid, we saw on average a slight decrease from pre-covid levels but the home advantage was back, even if we have to take those results with a grain of salt due to the confidence intervals' values.
-
+To wrap it up for this section, we can conclude that the Covid period had a negative effect on the previously existing home advantage. When looking at the estimates of the coefficients, it nearly cancels the home effect during the lockdown period. After Covid, we saw on average a slight decrease from pre-Covid levels but the home advantage was back, even if we have to take those results with a grain of salt due to the confidence intervals' values.
 
 # Additional studies
+
+We now further the study with three additional studies. First, we check whether the residuals with our problems seem reasonable and that we capture the majority of the variance which would be a good indicator for our model's quality. Secondly, we create a larger model with nearly all variables from our dataset and check whether our previous results still stand with this new model. Thirdly, we explore a possible draw effect on the home advantage.
 
 ## Residuals
 
 ```{r,echo=FALSE,warning=FALSE,message=FALSE}
-
 Data %>% mutate_if(is.factor,as.numeric) %>% 
                    mutate(res=resid(prm)) %>%
   pivot_longer(-res) %>% ggplot(aes(y=res,x=value)) + 
@@ -193,11 +183,11 @@ Data %>% mutate_if(is.factor,as.numeric) %>%
   facet_wrap(~ name, scales = "free") + geom_point() + geom_smooth()
 ```
 
-At first glance, we observe a pretty flat residuals for all the variables which were used in our prediciton, which is a good sign. We also observe a few bigger residuals when playing during covid. There are also some teams and opponents which have higher residuals than other, as seen above.
+At first glance, we observe pretty flat residuals for all the variables which were used in our prediction, which is a good sign. We also observe a few bigger residuals when playing during Covid. There are also some teams and opponents which have higher residuals than other, as seen above.
 
 ## Larger model
 
-In this sub-section, we check whether there is a significant difference between our simple model and the biggest model possible (excluding interactions) with the given data. To do so, we only keep the columns which are in the four seasons' datasets and then train the model by adding the interaction between home and Covid. The model is shown hereunder, as well as the estimates and CIs of the interesting factors:
+In this sub-section, we check whether there is a significant difference between our simple model and the biggest model possible (excluding interactions) with the given data. To do so, we only keep the variables which are in the four seasons' datasets and then fit the model by adding the interaction between home and Covid. The model is shown below, as well as the estimates and CIs of the interesting factors:
 
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
 cols <- intersect(intersect(intersect(names(m_1819), names(m_1920)),names(m_2021)),names(m_2122))
@@ -304,14 +294,14 @@ full_sum_fact <- cbind(full_sum_fact,full_conf_int)
 full_sum_fact %>% kable(digit=3,caption = "Estimations of coefficients for interesting factors - full model") %>% kable_styling()
 ```
 
-Fortunately, when comparing the obtained estimates and CIs for the biggest model to the one used in our project, we find similar results. One small variation is the estimate of the home effect before covid which goes from $21\%$ to $14\%$. Other than that, we obtain the same negative effect of the Covid lockdown on the home effect with negative CIs and also a mixed answer for the home advantage after Covid when looking at the CIs (both negative and positive).
+Fortunately, when comparing the obtained estimates and CIs for the biggest model to the one used in our project, we find similar results. One small variation is the estimate of the home effect before Covid which goes from $21\%$ to $14\%$, most probably because a portion of the previous effect is explained by another variable in the model. Other than that, we obtain the same negative effect of the Covid lockdown on the home effect with negative CIs and also a mixed answer for the home advantage after Covid when looking at the CIs (both negative and positive).
 
 ## Draw effect
 
 The last additional study that we wanted to share was whether the game finishing in a draw would affect the home advantage when playing before, during or after Covid lockdowns. To do so, we changed the dataset by adding a `draw` flag and added this flag and its interaction with `home` to the Poisson regression model, which gives the following model :
 
 $$log(Y_{i,j}) = \beta_1 \cdot H + \beta_2 \cdot C_{in} + \beta_3 \cdot C_{later} +\beta_4 \cdot D+ \beta_5 \cdot H *  C_{in} + \beta_6 \cdot H * C_{later} + \beta_7 \cdot H*D +\beta_8 \cdot T_i + \beta_9 \cdot O_j $$
-where $D$ is the flag whether there is a draw or not during the match.
+where $D$ is the flag whether there is a draw or not during the match and all other notations are previously described in [Poisson Regression model]
 
 Below are the coefficients and their respective CIs from the new model :
 
@@ -344,13 +334,15 @@ draw_sum_coef %>%
 ```
 As seen above, we observe that the draw effect has overall negative impact on the number of expected goals. When playing at home, the home advantage is reduced on average by $10\%$ when there is a draw, but when looking at the CIs, it can range from a $24\%$ decrease to an increase of $7\%$
 
-Even though this is an interesting point, one could think that there might be a problem here, meaning that the snake is biting its own tail. If we go back to the definition of the Home Advantage, it states that a given team might score more goals than playing away, and therefore on average win more games when playing at home. This means that the draw might be a consequence of the home effect, and therefore studying the home effect change from a draw effect point of view might be problematic.
+Even though this is an interesting point, one could think that there might be a problem here, namely that the snake is biting its own tail. If we go back to the definition of the Home Advantage, it states that a given team might score more goals than playing away, and therefore on average win more games when playing at home. This means that the draw might be a consequence of the home effect, and therefore studying the home effect change from a draw effect point of view might be problematic. Due to limited time, we could not explore this effect any further.
 
 # Conclusion
 
-To conclude, we created a Poisson regression model to answer a main question : Did home advantage persist through Covid? To answer this question in more detail, we divided it into three sub-questions. Firstly, we showed that the home effect was indeed present in the English Premier League during both $2018-2019$ and $2019-2020$ season which was just before the Covid lockdowns. Secondly, we verified statistically that there was a negative effect from the lockdowns to the home effect, which nearly canceled it during the $2020-2021$ season. Lastly, we obtained mixed results for the period after Covid, where we did not know whether the home effect was reduced or increased due to too wide CIs. A possible remedy would be to gather more data after the $2021-2022$ season to tighten those confidence intervals. Additionnaly, we looked at the residuals of our model, then compared the obtained results to a bigger model from which we fortunately obtained similar results. Latsly, we studied the draw effect but got stuck with an interpretation problem which is yet to be solved.
+To conclude, we created a Poisson regression model to answer a main question : Did home advantage persist through Covid? 
 
-The next steps would be to do a deeper analysis on this draw effect, and potentieally a similar analysis on the number of red or yellow cards which were given before, during and after Covid to see whether a home advantage was also significant regarding referee's decisions.
+To answer this question in more detail, we divided it into three sub-questions. Firstly, we showed that the home effect was indeed present in the English Premier League during both $2018-2019$ and $2019-2020$ season which were just before the Covid lockdowns. Secondly, we verified statistically that there was a negative effect from the lockdowns to the home effect, which nearly canceled it during the $2020-2021$ season. Lastly, we obtained mixed results for the period after Covid, where we did not know whether the home effect was reduced or increased due to too wide CIs. A possible remedy would be to gather more data after the $2021-2022$ season to tighten those confidence intervals. **To answer the question in one sentence, one could say that the pre-existing home advantage got annihilated on average during the lockdowns before reappearing after covid lockdowns ended.**
+
+Additionally, we looked at the residuals of our model, then compared the obtained results to a bigger model from which we fortunately obtained similar results. Latsly, we studied the draw effect but got stuck with an interpretation problem which is yet to be solved. The next steps would be to do a deeper analysis on this draw effect, and potentieally a similar analysis on the number of red or yellow cards which were given before, during and after Covid to see whether a home advantage was also significant regarding referee's decisions.
 
 # Appendix
 
@@ -368,6 +360,7 @@ tot_sum %>% kable(digit=3,caption = "Estimations of coefficients for all factors
 
 ## Comparison of models
 
+Hereunder is first a comparison between the model with or without taking the team and its opponent into consideration, then whether the results with or without an intercept are the same or not.
 ```{r,echo=FALSE,message=FALSE,warning=FALSE}
 AUC_eval <- function(gmodel,Data){
   set.seed(517)
@@ -397,3 +390,22 @@ print(paste0("With team BIC: ", BIC(prm))) # 8480.303
 
 anova(prm,prm_wo_teams) # deviance : -549.88
 ```
+As previously observed, we see that the model with the teams is more precise and predicts better.
+
+
+We now check whether having an intercept changes the estimates significantly:
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+
+prm_w_inter <- glm(goals ~ team + opponent + home + covid + covid:home, data=Data, family=poisson(link="log"))
+
+sum_w_inter <- summary(prm_w_inter)$coefficients
+sum_w_inter <- sum_w_inter[52:56,]
+row.names(sum_w_inter) <- c("$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$",
+                              "$\\beta_5$")
+sum_w_inter %>% 
+  kable(digit=3,caption = "Estimations of coefficients for interesting factors - intercept model") %>% 
+  kable_styling()
+```
+
+Fortunately, it does not. It has therefore been decided to not have an intercept in this model, as it is not necessary for the analyses in this project.
