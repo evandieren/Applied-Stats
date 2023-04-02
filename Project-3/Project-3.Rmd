@@ -133,12 +133,11 @@ The main result from Poisson Regression theory that will be used afterwards is r
 
 # Did home advantage persist through Covid?
 
-Now that we have a model which enables us to understand how the number of expected goals react to the teams playing, whether before, during or after covid, at home or away, we can tackle the main part of this project. To answer the main question, we will answer four subsidiary questions to grasp the home advantage phenomenon a bit better:
+Now that we have a model which enables us to understand how the number of expected goals react to the teams playing, whether before, during or after covid, at home or away, we can tackle the main part of this project. To answer the main question, we will answer three subsidiary questions to grasp the home advantage phenomenon a bit better:
 
 * Was there home advantage before Covid?
 * Did home advantage reduced during Covid?
 * How did it evolved after Covid?
-* What are the confidence intervals of those evolutions?
 
 To answer those questions, one can have a look at the summary of the model which can be found in full here : [Summary of the model] and in a simplified version below:
 
@@ -146,30 +145,167 @@ To answer those questions, one can have a look at the summary of the model which
 sum <- summary(prm)
 sum_fact <- sum$coefficients[52:56,] 
 row.names(sum_fact) <- c("$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$","$\\beta_5$")
-sum_fact %>% kable(digit=3,caption = "Summary of interesting factors") %>% kable_styling()
+
+conf_int <- confint(prm,parm = c("home1","covidin","covidlater","home1:covidin","home1:covidlater"))
+row.names(conf_int) <- c("$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$","$\\beta_5$")
+
+sum_fact <- cbind(sum_fact,conf_int)
+
+sum_fact %>% kable(digit=3,caption = "Estimations of coefficients for interesting factors") %>% kable_styling()
 ```
+
+We also computed confidence intervals which help us know whether there is a large variance on those estimates, which might blur the results and decrease the confidence we would have in the estimate itself and the consequences of their values. To do so, one can compute confidence intervals for each of the coefficients used, mainly $\beta_{1:5}$ using the `confint` R command. One notes that this command returns the Profile Likelihood CIs, and not the Wald which can be computed using `confint.default` but assumes normality.
 
 ## Was there a home advantage before Covid?
 
-To statistically answer this question, one needs to take a look at the coefficients in front of the `home` variable. As the baseline factor for Covid is `before`, one finds that the home effect before Covid will be $exp(\beta_1)=1.21$. This means that when a team is playing at home, it gets $1.21$ times more goals than when playing away, all other parameters being equal (marginal effect) before Covid hits. The answer to the question is therefore affirmative, and by a large margin.
+To statistically answer this question, one needs to take a look at the coefficients in front of the `home` variable. As the baseline factor for Covid is `before`, one finds that the home effect before Covid will be approximately $\exp(\beta_1)=1.21$. This means that, on average, when a team is playing at home, it gets $21\%$ times more goals than when playing away, all other parameters being equal before Covid hits. When looking at the $95\%$ confidence interval, we see that playing at home before covid indeed gives the team a positive effect, as the lower and upper bound are positive. Namely, we get that the home effect is between $10\%$ and $33\%$ with a $95\%$ confidence interval.
 
 ## Did home advantage reduced during Covid?
 
-To tackle this question, one can have a look at the interaction between the `home` and the `covidIn` flag. By using the same strategy as the previous question, we can simply sum the coefficients of `home` and `home:covidIn` which will give us the coefficient of the home advantage during coving. One finds $exp(\beta_1 + \beta_4) = exp(0.194 + -0.187) = 1.01$, meaning that during covid, the home advantage has nearly no impact on the expected goals, as playing at home will only increase the number of goals by $1\%$, which is highly reduced from before covid ($21\%$).
+To tackle this question, one can have a look at the interaction between the `home` and the `covidIn` flag. By using the same strategy as the previous question, we can simply sum the coefficients of `home` and `home:covidIn` which will give us the coefficient of the home advantage during Covid. One finds $\exp(\beta_1 + \beta_4) = \exp(0.194 + -0.187) = 1.01$, meaning that on average during Covid, the home advantage has nearly no impact on the expected goals, as playing at home will only increase the number of goals by $1\%$, which is highly reduced from before Covid ($21\%$). When looking at the CIs, we observe that both upper and lower bounds of the interaction between `home` and `covidIn` are negative, which shows that there is a reduction of the home effect during the lock-down period. More precisely, we get a reduction of the home effect between $3\%$ and $28%$.
 
 ## How did it evolved after Covid? 
-After covid, we can check the coefficient of `home:CovidLater` which is equal to $\beta_5 = -0.05$, meaning that there will be a slight decrease of the home effect after covid hits, but it does not cancels as during the covid lockdowns. Quantitatively, the home advantage after covid is equal to $exp(0.194-0.05) = 1.15$, meaning that there is a $15%$ increase of number of expected goals after covid due to home effect.
 
-## What are the confidence intervals of those evolutions?
-
-To do so, one can compute confidence intervals for each of the used, mainly $\beta_{1,4,5}$ using the `confint` command.
-
-We obtain the following $5\%$ confidence intervals
-
-Insert table
+After Covid, we can check the coefficient of `home:CovidLater` which is equal to $\beta_5 = -0.05$, meaning that there will be a slight decrease of the home effect after Covid hits, but it does not cancels as during the Covid lockdowns. Quantitatively, the home advantage after Covid is equal to $\exp(0.194-0.05) = 1.15$, meaning that there is on average a $15%$ increase of number of expected goals after Covid due to home effect. However, when looking at the CIs,  things get a little more tricky. In fact, we observe that the home effect after Covid hits gets a multiplicative factor ranging from $0.82$ to $1.11$ which means that in reality, with this $95\%$ confidence level, one can not conclude whether there was an increase or a decrease of the home effect after Covid hit with respect to its value before Covid.
 
 
-# Question 4
+To wrap it up for this section, we can conclude that the Covid wave had a negative effect on the existing home advantage. When looking at the estimates of the coefficients, it even totally cancels the home effect during the lockdown period. After covid, we saw on average a slight decrease from pre-covid levels but the home advantage was back, even if we have to take those results with a grain of salt due to the confidence intervals' values.
+
+
+# Additional studies
+
+## Residuals
+
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+
+Data %>% mutate_if(is.factor,as.numeric) %>% 
+                   mutate(res=resid(prm)) %>%
+  pivot_longer(-res) %>% ggplot(aes(y=res,x=value)) + 
+  labs(title = "Residuals vs Variable plot", 
+       caption="Fig 1 : Residuals points and smoothing function wrt. covariate values",
+       y = "Residuals", x = "Variable value")+ 
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=10,face="bold"),
+        title= element_text(size=15,face="bold"),
+        plot.caption = element_text(size=12))+ 
+  facet_wrap(~ name, scales = "free") + geom_point() + geom_smooth()
+```
+
+At first glance, we observe a pretty flat residuals for all the variables which were used in our prediciton, which is a good sign. We also observe a few bigger residuals when playing during covid. There are also some teams and opponents which have higher residuals than other, as seen above.
+
+## What happens if we remove the imbalanced season (19-20)
+```{r}
+start1 <- 381
+end1 <- 640
+start2 <- start1+1400
+end2 <- end1+1400
+indices <- c(start1:end1,start2:end2)
+Data_wo1920 <- Data[-indices,]
+
+prm_wo1920 <- glm(goals ~ team + opponent + home + covid + covid:home - 1,
+                  data=Data_wo1920, 
+                  family=poisson(link="log"))
+
+sum_wo1920 <- summary(prm_wo1920)
+sum_fact_wo1920 <- sum_wo1920$coefficients[52:56,] 
+row.names(sum_fact_wo1920) <- c("$\\beta_1$","$\\beta_2$","$\\beta_3$","$\\beta_4$","$\\beta_5$")
+sum_fact_wo1920 %>% kable(digit=3,caption = "Estimations of coefficients for interesting factors - without 2019-2020") %>% kable_styling()
+
+```
+
+Unsurprisingly, 
+## Larger model
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+cols <- intersect(intersect(intersect(names(m_1819), names(m_1920)),names(m_2021)),names(m_2122))
+
+cols <- cols[-c(1,2)]
+
+full_data <- rbind(m_1819[,cols],m_1920[,cols],m_2021[,cols],m_2122[,cols])
+
+team_names <- cols
+team_names[1] <- "team"
+team_names[2] <- "opponent"
+team_names[3] <- "goals"
+team_names[4] <- "opponent_goals"
+team_names[5] <- "result"
+team_names[6] <- "ht_goals"
+team_names[7] <- "ht_opponent_goals"
+team_names[8] <- "ht_result"
+team_names[10] <- "team_shots"
+team_names[11] <- "opponent_shots"
+team_names[12] <- "team_shots_on_target"
+team_names[13] <- "opponent_shots_on_target"
+team_names[14] <- "team_fouls"
+team_names[15] <- "opponent_fouls"
+team_names[16] <- "team_corners"
+team_names[17] <- "opponent_corners"
+team_names[18] <- "team_yellow"
+team_names[19] <- "opponent_yellow"
+team_names[20] <- "team_red"
+team_names[21] <- "opponent_red"
+
+away_names <- cols
+away_names[1] <- "opponent"
+away_names[2] <- "team"
+away_names[3] <- "opponent_goals"
+away_names[4] <- "goals"
+away_names[5] <- "result"
+away_names[6] <- "ht_opponent_goals"
+away_names[7] <- "ht_goals"
+away_names[8] <- "ht_result"
+away_names[10] <- "opponent_shots"
+away_names[11] <- "team_shots"
+away_names[12] <- "opponent_shots_on_target"
+away_names[13] <- "team_shots_on_target"
+away_names[14] <- "opponent_fouls"
+away_names[15] <- "team_fouls"
+away_names[16] <- "opponent_corners"
+away_names[17] <- "team_corners"
+away_names[18] <- "opponent_yellow"
+away_names[19] <- "team_yellow"
+away_names[20] <- "opponent_red"
+away_names[21] <- "team_red"
+
+full_AwayData <- full_data
+full_AwayData$home = 0
+names(full_AwayData) <- c(away_names,"home")
+
+full_data$home = 1
+names(full_data) <-  c(team_names,"home")
+
+full_data <- rbind(full_data,full_AwayData)
+
+full_data <- full_data %>% mutate(result = as.factor(result),
+                                  ht_result = as.factor(ht_result),
+                                  Referee = as.factor(Referee),
+                                  team=as.factor(team),
+                                  opponent = as.factor(opponent),
+                                  covid = as.factor(covid),
+                                  home = as.factor(home))
+
+full_prm <- glm(goals ~ . + home:covid, data=full_data, family=poisson(link="log"))
+
+anova(full_prm,prm) # way better model for prediction
+
+sum_full <- summary(full_prm)
+covidin <- sum_full$coefficients[120,]
+covidlater <- sum_full$coefficients[121,]
+home1 <- sum_full$coefficients[122,]
+covidin_home1 <- sum_full$coefficients[123,]
+covidlater_home1 <- sum_full$coefficients[124,]
+
+sum_full_fact <- rbind(home1,covidin,covidlater,covidin_home1,covidlater_home1)
+
+row.names(sum_full_fact) <- c("$\\beta_1^{full}$","$\\beta_2^{full}$","$\\beta_3^{full}$","$\\beta_4^{full}$","$\\beta_5^{full}$")
+sum_full_fact %>% kable(digit=3,caption = "Estimations of coefficients for interesting factors - full model") %>% kable_styling()
+```
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+full_conf_int <- confint(full_prm,parm=c("home1","covidin","covidlater","covidin:home1","covidlater:home1"))
+row.names(full_conf_int) <- c("$\\beta_1^{full}$","$\\beta_2^{full}$","$\\beta_3^{full}$","$\\beta_4^{full}$","$\\beta_5^{full}$")
+full_conf_int %>% kable(digit=3,caption = "Confidence intervals for the coefficients") %>% kable_styling()
+```
 
 # Conclusion
 
@@ -178,10 +314,13 @@ Insert table
 
 ## Summary of the model
 
-```{r}
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+tot_sum <- summary(prm)$coefficients
+tot_confint <- confint(prm) 
 
-#summary(prm) %>% kable(digit=3,caption = "Summary of the model") %>% kable_styling()
+tot_sum <- cbind(tot_sum,tot_confint)
 
+tot_sum %>% kable(digit=3,caption = "Estimations of coefficients for all factors") %>% kable_styling()
 ```
 
 
