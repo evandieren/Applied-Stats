@@ -3,7 +3,7 @@ title: "Project 3 - Premier League Home Advantage during COVID"
 author: "Eliott Van Dieren"
 date: "`r Sys.Date()`"
 output: 
-  html_document:
+  bookdown::html_document2:
     theme: united
     number_sections: true
     toc: true
@@ -165,7 +165,7 @@ To wrap it up for this section, we can conclude that the Covid period had a nega
 
 # Additional studies
 
-We now further the study with three additional studies. First, we check whether the residuals with our problems seem reasonable and that we capture the majority of the variance which would be a good indicator for our model's quality. Secondly, we create a larger model with nearly all variables from our dataset and check whether our previous results still stand with this new model. Thirdly, we explore a possible draw effect on the home advantage.
+We now further the study with three additional studies. First, we check whether the residuals with our covariates seem reasonable and that we capture the majority of the variance which would be a good indicator for our model's quality. Secondly, we create a larger model with nearly all variables from our dataset and check whether our previous results still stand with this new model. Thirdly, we explore a possible draw effect on the home advantage.
 
 ## Residuals
 
