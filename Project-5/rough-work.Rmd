@@ -1,0 +1,34 @@
+---
+title: "Climate Change prediction"
+author: "Eliott Van Dieren"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+```
+
+## Importing Data
+
+```{r}
+temperature <- read_csv("Data/temperature.csv",skip = 1)
+```
+
+## Todo list:
+
+* Import the data, transform to `ts()` object then plot them
+* Build a SARIMA model for (a part of) the temperature series (To wrap up : see slide 29)
+    + Identify seasonality and trend from the plots and common sense (tip, si la variance increase, bonne idée de log la time series en elle même (faut faire gaffe car je pense que ça sera négatif donc rip.))
+    + To remove the trend, one can fit various models to model the mean. Once this model is fitted, we extract its residuals which will be the difference between the time series and the fitted data (sqrd error?)
+    + Find the seasonality parameter `s` (To remove seasonality, we can differentiate the data with respect to a given lag (on the residuals)) -> maybe not usefull given the previous points?
+    + Once this is done, we have a residuals (time series) from which we can build a SARIMA model on, and fit its order and parameters with ACF/PACF. (library(DescTools)) slide 21-22 pour explication générale d'un ARMA si on veut parler un peu + du théorique. Quand on ajoute le S dans ARMA, on ajoute des polynômes de differentiabilité. all parameters are estimated by maximum likelihood using function arima() in R
+    + To wrap up : see slide 29
+* Perform residual diagnostics and predictive checking for the candidate
+models to select your final model. (c'est dans les slides -> on identifie un gros model SARIMA du point précédement, et on test ici toutes les combinaisons des ordres + petits pour submodels), predictive checking -> see slide.
+* Visualize your predictions until 2050 using the final model.
+* After Lecture 10 try to answer the two questions above (is there
+seasonality in the temperature time series, and what is the form of global warming). Now, what form does global warming take?
+    +if you feel a bit lost, focus first on the simpler 1970-2005 period, where the trend can be modeled simply as linear in time
+ 
