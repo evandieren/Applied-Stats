@@ -8,22 +8,74 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(readr)
+library(zoo)
+library(reshape2)
 ```
 
-## Importing Data
+## Plotting the time series
 
 ```{r}
-temperature <- read_csv("Data/temperature.csv",skip = 1)
+temperature <- read.csv("Data/temperature.csv",skip = 1,row.names="Year")
+temperature <- temperature[,1:12]
+
+temp <- as.numeric(unlist(t(temperature)))
+ts_temp <- ts(temp,start=1880,frequency=12)
+plot(ts_temp)
+
+CO2_emissions <- read_csv("Data/CO2_emissions.csv")
+CO2_emissions = CO2_emissions[CO2_emissions$Entity=="World",] # worldwide
+ts_CO2_emissions <- ts(CO2_emissions$`Annual CO₂ emissions`,start=1750,frequency=1)
+plot(ts_CO2_emissions,log="y")
+
+CO2_atmos <-  read_csv("Data/CO2_atmosphere.csv",skip=55)
+ts_CO2_atmos = ts(CO2_atmos$average,start=1979,frequency=12)
+plot(ts_CO2_atmos)
+```
+
+## Building a SARIMA model for the temperature series
+
+```{r}
+
+# Trying to remove the upward trend, no seasonality seem to appear but one could think that 
+# s=12 might be a common sense lag to use
+sd_temp <- diff(temp, lag=1) # s = 12
+plot(sd_temp,type="l")
+
+lmData <- data.frame(y = ts_temp,
+                     month = as.factor(rep(1:12,length(ts_temp)/12)),
+                     t = 1:length(ts_temp))
+
+lmfit <- lm(y~., data=lmData)
+
+plot(ts_temp,type="l")
+points(seq(1880, 2023, length=1716),fitted(lmfit),type="l",col="blue")
+plot(resid(lmfit), type="l", col="blue")
+
+lmfit2 <- lm(y~.+I(t^2), data=lmData)
+plot(ts_temp)
+points(seq(1880, 2023, length=1716),fitted(lmfit2), type="l", col="red")
+plot(resid(lmfit2), type="l", col="red")
+
+
+library(mgcv) # package for generalized additive models 
+gamfit <- gam(y~s(t)+month, data=lmData)
+plot(gamfit,temp)
+
+
+
+points(seq(1949, 1961, length=144), fitted(gamfit), type="l", col="red")
+plot(resid(gamfit), type="l", col="red")
+
 ```
 
 ## Todo list:
 
-* Import the data, transform to `ts()` object then plot them
+* <s> Import the data, transform to `ts()` object then plot them </s>
 * Build a SARIMA model for (a part of) the temperature series (To wrap up : see slide 29)
     + Identify seasonality and trend from the plots and common sense (tip, si la variance increase, bonne idée de log la time series en elle même (faut faire gaffe car je pense que ça sera négatif donc rip.))
     + To remove the trend, one can fit various models to model the mean. Once this model is fitted, we extract its residuals which will be the difference between the time series and the fitted data (sqrd error?)
     + Find the seasonality parameter `s` (To remove seasonality, we can differentiate the data with respect to a given lag (on the residuals)) -> maybe not usefull given the previous points?
-    + Once this is done, we have a residuals (time series) from which we can build a SARIMA model on, and fit its order and parameters with ACF/PACF. (library(DescTools)) slide 21-22 pour explication générale d'un ARMA si on veut parler un peu + du théorique. Quand on ajoute le S dans ARMA, on ajoute des polynômes de differentiabilité. all parameters are estimated by maximum likelihood using function arima() in R
+    + Once this is done, we have a residuals (time series) from which we can build a SARIMA model on, and fit its order and parameters with ACF/PACF. (   library(DescTools)) slide 21-22 pour explication générale d'un ARMA si on veut parler un peu + du théorique. Quand on ajoute le S dans ARMA, on ajoute des polynômes de differentiabilité. all parameters are estimated by maximum likelihood using function arima() in R
     + To wrap up : see slide 29
 * Perform residual diagnostics and predictive checking for the candidate
 models to select your final model. (c'est dans les slides -> on identifie un gros model SARIMA du point précédement, et on test ici toutes les combinaisons des ordres + petits pour submodels), predictive checking -> see slide.
