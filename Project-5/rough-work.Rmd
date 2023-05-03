@@ -11,7 +11,11 @@ library(readr)
 library(DescTools)
 library(mgcv) # package for generalized additive models 
 library(forecast)
+library(nlme)
+library(car)
 ```
+
+# Working on temperature
 
 ## Plotting the time series
 
@@ -31,6 +35,11 @@ plot(ts_CO2_emissions)
 CO2_atmos <-  read_csv("Data/CO2_atmosphere.csv",skip=55)
 ts_CO2_atmos = ts(CO2_atmos$average,start=1979,frequency=12)
 plot(ts_CO2_atmos)
+
+
+
+# prove or refute the exponential trend : model linear + poly + exp and check params significance
+# Utiliser stl() pour voir la décomp et voir la trend
 ```
 ## Truncating the temperature series
 
@@ -43,75 +52,142 @@ ts_temp <- window(ts_temp,start=start_y)
 plot(ts_temp)
 ```
 
-## Building a SARIMA model for the temperature series
+## Finding a trend for the temperature time-series
 
 ```{r}
-
-# Trying to remove the upward trend, no seasonality seem to appear
-# If we still observe seasonality, then s=12 might be the best choice
-# (due to north hemisphere measurements?)
-
-# Using the diff(1) so no seasonal diff but purely to make it stationary
-sd_temp <- diff(ts_temp, lag=1)
-plot(sd_temp,type="l")
-# it is reasonable to see it as stationary, no trend or difference of the mean over time and the variance seem more or less constant
+# Trying to remove the upward trend
 
 lmData <- data.frame(y = ts_temp,
                      month = as.factor(rep(1:12,length(ts_temp)/12)),
                      t = 1:length(ts_temp))
 
-lmfit <- lm(y~., data=lmData)
+lmfit <- lm(y~ t + I(t^2) + exp(t/20) + month, data=lmData)
 plot(ts_temp)
 points(seq(start_y, 2023, length=length(ts_temp)),fitted(lmfit), type="l", col="red")
 plot(resid(lmfit), type="l", col="red")
 
+ts_res <- ts(resid(lmfit),start=start_y,frequency=12)
+
+summary(lmfit)
+```
+
+
+## Fitting a SARIMA model on the residual
+
+```{r}
+
+PlotACF(ts_res)
+# One finds p,q = 2
+
+fit <- arima(ts_res,order=c(2,0,2))
+
+acf(fit$residuals); pacf(fit$residuals)
+
+
+qqnorm(fit$residuals)
+qqline(fit$residuals)
+```
+Now, one can check if a submodel might do a better job
+
+```{r}
+fit_21 <- arima(ts_res, order=c(2,0,1))
+fit_12 <- arima(ts_res, order=c(1,0,2))
+fit_11 <- arima(ts_res, order=c(1,0,1))
+cat(c(fit$aic,fit_21$aic,fit_12$aic, fit_11$aic))
+
+n <- length(ts_res)
+train <- 1:(n-floor(n/3))
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-step ahead forecast 
+for(j in 0:(floor(n/3)-2)){
+  fit <- arima(ts_res[train+j], order=c(2,0,2))
+  Err[1,j+1] <- sum(ts_res[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_res[train+j], order=c(2,0,1))
+  Err[2,j+1] <- sum(ts_res[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_res[train+j], order=c(1,0,2))
+  Err[3,j+1] <- sum(ts_res[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+}
+rowMeans(Err)
+
+# fit 202 , fit 201, fit 102
+#0.03298126 0.03331282 0.03331522 -> fit 202 is better
+```
+
+## Fitting the gls model with ARMA covariance
+
+```{r}
+R_struct <- corARMA(form=~t, p=2,q=2) # AR(2,0,2) correlation structure 
+glsfit <- gls(y~t + I(t^2) + exp(t/20) + month, data=lmData, corr=R_struct, method="ML") 
+confint(lmfit)["t",]
+```
+
+```{r}
+plot(as.numeric(lmData$y),type="l")
+points(fitted(lmfit),type="l", col="red")
+points(fitted(glsfit),type="l", col="blue", lty=2)
+
+plot(resid(lmfit),type="l",col="red")
+points(as.numeric(resid(glsfit)),type="l", col="blue", lty=2)
+```
+So basically, it is the same as with the exponential model we found earlier. Now, lets test them
+
+
+## Testing for significance (answering both questions)
+
+```{r}
+Anova(glsfit, type=2)
+
+sig_glsfit <- gls(y~t + I(t^2) + month, data=lmData, corr=R_struct, method="ML") 
+
+
+anova(glsfit,sig_glsfit)
+
+```
+
+From this test, we observe the non-significance of the exponential part of the modeling, and the significance of the linear and quadratic dependance on time. This helps us answering the question regarding the exponential growth of the temperature around the globe : *it is not significant*, one could see that a low quadratic function might work better to fit the model. Furthermore, we observe a strong significance regarding the `month` factor, meaning that there is seasonality regarding the temperature month per month, even though the collected data should be without seasonality as it is supposed to represent the global temperature around the world. This could be due to more measurements made in the north or south hemisphere, which could bias the total mean to a north or south hemisphere seasonal effect.
+
+## Predicting temperature until 2050
+
+# Using GAMs and SARIMA model for residual (Prediction only)
+
+Instead of working with Generalized Least Square, one can first try to fit the trend with a Generalized Additive model and then find SARIMA parameters for its residuals. This can help us answer the seasonality question based on the parameters found in the SARIMA model for residuals, but does not answer the question regarding the exponential growth.
+
+```{r}
 gamfit <- gam(y~s(t)+month, data=lmData)
 plot(ts_temp)
 points(seq(start_y, 2023, length=length(ts_temp)), fitted(gamfit), type="l", col="red")
 plot(resid(gamfit), type="l", col="red")
-
-mse_gam <- sum((resid(gamfit))^2)
-mse_lm <- sum((resid(lmfit))^2)
+summary(gamfit)
 
 # gam is better (can be seen in the plots that it averages it better)
-```
+``` 
 
 As seen above, both models are pretty good regarding the trend approximation, and both residuals seem relatively stationary, with values ranging from -0.4 to 0.4, and with no apparent remaining trend. If we simply look at the sum of squared error, we see that the GAM model has a lower error than the linear model.
 
 
 ```{r}
 ts_gam <- ts(resid(gamfit),start=start_y,frequency=12)
-
-
 PlotACF(ts_gam)
 
 # 10log_10(n) = 28.78522
 # s = 12, so we will check for k=1,2 and thats it
-
-PlotACF(sd_temp)
-
 ```
 
 From the ACF plot, we observe exponential decay, which goes below the significance threshold after the order $5-6$, but no real cut-off. From the PACF, we observe a cutoff after lag $2$. One could therefore think of $p=2$ for the AR part of the ARMA model, and no clear value for $q$, even though we see an important decrease (yet no cut-off) at $q=2$.
 
 
 ```{r}
-fit <- arima(ts_gam, order=c(2,0,8))
-acf(fit$residuals); pacf(fit$residuals)
 
 fit_22 <- arima(ts_gam, order=c(2,0,2))
 acf(fit_22$residuals); pacf(fit_22$residuals)
-
-
-cat(c(fit$aic, fit_22$aic))
-
 
 # Diagnostics 
 acf(fit_22$residuals); pacf(fit_22$residuals)
 qqnorm(fit_22$residuals)
 qqline(fit_22$residuals)
 ```
-QQPlots seem reasonable, PACF and ACF looks good for white noise.
+QQPlots seem reasonable, PACF and ACF looks good for white noise. 
+
+Now one can have a look at submodels of the ARMA plot and check whether lower orders for the AR and MA component make sense
 
 ```{r}
 
@@ -173,7 +249,7 @@ c(final_fit$aic,fit_22$aic,sub_final_fit$aic)
 
 n <- length(ts_gam)
 train <- 1:(n-floor(n/3))
-Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-step ahead forecast 
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-month ahead forecast 
 for(j in 0:(floor(n/3)-2)){
   fit <- arima(ts_gam[train+j], order=c(2,0,2))
   Err[1,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
@@ -212,6 +288,26 @@ for(j in 0:(floor(n/3)-2)){
 }
 rowMeans(Err)
 ```
+
+
+
+## Forecasting up to 2050
+
+
+```{r}
+fit <- Arima(ts_gam, order=c(2,0,2), seasonal=c(2,0,0)) # capital
+preds <- forecast(fit, 12, c(0.05,0.95))
+plot(preds)
+
+# faire residu + trend
+
+tot_auto <- auto.arima(ts_temp)
+auto_preds <- forecast(tot_auto, 12*10, c(0.05,0.95))
+plot(auto_preds)
+```
+
+
+
 
 ## Todo list:
 
