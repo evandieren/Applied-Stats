@@ -8,8 +8,9 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(readr)
-library(zoo)
-library(reshape2)
+library(DescTools)
+library(mgcv) # package for generalized additive models 
+library(forecast)
 ```
 
 ## Plotting the time series
@@ -25,56 +26,200 @@ plot(ts_temp)
 CO2_emissions <- read_csv("Data/CO2_emissions.csv")
 CO2_emissions = CO2_emissions[CO2_emissions$Entity=="World",] # worldwide
 ts_CO2_emissions <- ts(CO2_emissions$`Annual CO₂ emissions`,start=1750,frequency=1)
-plot(ts_CO2_emissions,log="y")
+plot(ts_CO2_emissions)
 
 CO2_atmos <-  read_csv("Data/CO2_atmosphere.csv",skip=55)
 ts_CO2_atmos = ts(CO2_atmos$average,start=1979,frequency=12)
 plot(ts_CO2_atmos)
+```
+## Truncating the temperature series
+
+As one can see thanks to the plot above, we can identify a changing point of the trend in the 60s, which fluctuates between 1880 and 1960 then increases linearly from 1960 onwards. A reasonable assumption would therefore be that this linear trend would continue for the near future, as it did for around 60 years.
+
+
+```{r}
+start_y <- 1960
+ts_temp <- window(ts_temp,start=start_y)
+plot(ts_temp)
 ```
 
 ## Building a SARIMA model for the temperature series
 
 ```{r}
 
-# Trying to remove the upward trend, no seasonality seem to appear but one could think that 
-# s=12 might be a common sense lag to use
-sd_temp <- diff(temp, lag=1) # s = 12
+# Trying to remove the upward trend, no seasonality seem to appear
+# If we still observe seasonality, then s=12 might be the best choice
+# (due to north hemisphere measurements?)
+
+# Using the diff(1) so no seasonal diff but purely to make it stationary
+sd_temp <- diff(ts_temp, lag=1)
 plot(sd_temp,type="l")
+# it is reasonable to see it as stationary, no trend or difference of the mean over time and the variance seem more or less constant
 
 lmData <- data.frame(y = ts_temp,
                      month = as.factor(rep(1:12,length(ts_temp)/12)),
                      t = 1:length(ts_temp))
 
 lmfit <- lm(y~., data=lmData)
-
-plot(ts_temp,type="l")
-points(seq(1880, 2023, length=1716),fitted(lmfit),type="l",col="blue")
-plot(resid(lmfit), type="l", col="blue")
-
-lmfit2 <- lm(y~.+I(t^2), data=lmData)
 plot(ts_temp)
-points(seq(1880, 2023, length=1716),fitted(lmfit2), type="l", col="red")
-plot(resid(lmfit2), type="l", col="red")
+points(seq(start_y, 2023, length=length(ts_temp)),fitted(lmfit), type="l", col="red")
+plot(resid(lmfit), type="l", col="red")
 
-
-library(mgcv) # package for generalized additive models 
 gamfit <- gam(y~s(t)+month, data=lmData)
-plot(gamfit,temp)
-
-
-
-points(seq(1949, 1961, length=144), fitted(gamfit), type="l", col="red")
+plot(ts_temp)
+points(seq(start_y, 2023, length=length(ts_temp)), fitted(gamfit), type="l", col="red")
 plot(resid(gamfit), type="l", col="red")
 
+mse_gam <- sum((resid(gamfit))^2)
+mse_lm <- sum((resid(lmfit))^2)
+
+# gam is better (can be seen in the plots that it averages it better)
+```
+
+As seen above, both models are pretty good regarding the trend approximation, and both residuals seem relatively stationary, with values ranging from -0.4 to 0.4, and with no apparent remaining trend. If we simply look at the sum of squared error, we see that the GAM model has a lower error than the linear model.
+
+
+```{r}
+ts_gam <- ts(resid(gamfit),start=start_y,frequency=12)
+
+
+PlotACF(ts_gam)
+
+# 10log_10(n) = 28.78522
+# s = 12, so we will check for k=1,2 and thats it
+
+PlotACF(sd_temp)
+
+```
+
+From the ACF plot, we observe exponential decay, which goes below the significance threshold after the order $5-6$, but no real cut-off. From the PACF, we observe a cutoff after lag $2$. One could therefore think of $p=2$ for the AR part of the ARMA model, and no clear value for $q$, even though we see an important decrease (yet no cut-off) at $q=2$.
+
+
+```{r}
+fit <- arima(ts_gam, order=c(2,0,8))
+acf(fit$residuals); pacf(fit$residuals)
+
+fit_22 <- arima(ts_gam, order=c(2,0,2))
+acf(fit_22$residuals); pacf(fit_22$residuals)
+
+
+cat(c(fit$aic, fit_22$aic))
+
+
+# Diagnostics 
+acf(fit_22$residuals); pacf(fit_22$residuals)
+qqnorm(fit_22$residuals)
+qqline(fit_22$residuals)
+```
+QQPlots seem reasonable, PACF and ACF looks good for white noise.
+
+```{r}
+
+# Checking from (2,0,2) to submodels
+
+fit_21 <- arima(ts_gam, order=c(2,0,1))
+fit_12 <- arima(ts_gam, order=c(1,0,2))
+fit_11 <- arima(ts_gam, order=c(1,0,1))
+fit_23 <- arima(ts_gam, order=c(2,0,3))
+fit_24 <- arima(ts_gam, order=c(2,0,4))
+cat(c(fit_22$aic,fit_21$aic,fit_12$aic, fit_11$aic,fit_23$aic,fit_24$aic))
+
+#For model comparison, the model with the lowest AIC score is preferred. The absolute values of the AIC scores do not matter. These scores can be negative or positive.  -> fit_22 seem to be the best
+# see screenshot for citation
+
+
+n <- length(ts_gam)
+train <- 1:(n-floor(n/3))
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-step ahead forecast 
+for(j in 0:(floor(n/3)-2)){
+  fit <- arima(ts_gam[train+j], order=c(2,0,3))
+  Err[1,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j], order=c(2,0,2))
+  Err[2,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j], order=c(1,0,2))
+  Err[3,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+}
+rowMeans(Err)
+# 0.03243841 0.03237781 0.03268235
+
+# Both for AIC and rolling -> fit22 seem nice, it also has normal QQplots and residuals are white noise
+
+# Next step : check for PQ (see slides) -> how it behaves to previous months (1 behind, two behind etc?) -> it is not taken into account yet
+fit_22_ts <- resid(fit_22)
+
+
+# On the ts_gam ts
+myacf <- acf(ts_gam, main="ACF with 12k lags in red")
+season_lags <- seq(0,10*log(length(ts_gam),10), by=12)
+points(myacf$lag[1+season_lags], myacf$acf[1+season_lags], col="red", type="h", lwd=1.5)
+mypacf <- pacf(ts_gam)
+points(mypacf$lag[season_lags], mypacf$acf[season_lags], col="red", type="h", lwd=1.5)
+
+
+# On the residuals of fit_22
+myacf <- acf(fit_22_ts, main="ACF with 12k lags in red")
+season_lags <- seq(0,10*log(length(fit_22_ts),10), by=12)
+points(myacf$lag[1+season_lags], myacf$acf[1+season_lags], col="red", type="h", lwd=1.5)
+mypacf <- pacf(fit_22_ts)
+points(mypacf$lag[season_lags], mypacf$acf[season_lags], col="red", type="h", lwd=1.5)
+
+
+auto.arima(ts_gam)
+
+final_fit <- arima(ts_gam,order=c(2,0,2),seasonal = c(2,0,0))
+sub_final_fit <- arima(ts_gam,order=c(2,0,2),seasonal = c(1,0,0))
+
+c(final_fit$aic,fit_22$aic,sub_final_fit$aic)
+
+n <- length(ts_gam)
+train <- 1:(n-floor(n/3))
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-step ahead forecast 
+for(j in 0:(floor(n/3)-2)){
+  fit <- arima(ts_gam[train+j], order=c(2,0,2))
+  Err[1,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j],order=c(2,0,2),seasonal = c(2,0,0))
+  Err[2,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j],order=c(2,0,2),seasonal = c(1,0,0))
+  Err[3,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+}
+rowMeans(Err)
+# 0.03237781 0.03222906 0.03243106
+
+# So, one sees that the final SARIMA(2,0,2)x(2,0,0) yields both lowest AIC and predictive residuals
+resid_f_fit <- resid(final_fit)
+qqnorm(resid_f_fit)
+qqline(resid_f_fit)
+PlotACF(resid_f_fit)
+```
+So the final model would be SARIMA (2,0,2)x(2,0,0). auto.arima would give us ARIMA(2,0,3)(1,0,0)[12] with zero mean, which is slightly different from what we have found. However, we get lower AIC (-1277.461 vs -1278.698) and lower residual error (0.03222906 vs 0.03252401)
+
+```{r}
+
+auto <- auto.arima(ts_gam)
+
+c(auto$aic,final_fit$aic)
+
+n <- length(ts_gam)
+train <- 1:(n-floor(n/3))
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-step ahead forecast 
+for(j in 0:(floor(n/3)-2)){
+  fit <- arima(ts_gam[train+j], order=c(2,0,2))
+  Err[1,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j],order=c(2,0,2),seasonal = c(2,0,0))
+  Err[2,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j],order=c(2,0,3),seasonal = c(1,0,0))
+  Err[3,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+}
+rowMeans(Err)
 ```
 
 ## Todo list:
 
 * <s> Import the data, transform to `ts()` object then plot them </s>
 * Build a SARIMA model for (a part of) the temperature series (To wrap up : see slide 29)
-    + Identify seasonality and trend from the plots and common sense (tip, si la variance increase, bonne idée de log la time series en elle même (faut faire gaffe car je pense que ça sera négatif donc rip.))
-    + To remove the trend, one can fit various models to model the mean. Once this model is fitted, we extract its residuals which will be the difference between the time series and the fitted data (sqrd error?)
-    + Find the seasonality parameter `s` (To remove seasonality, we can differentiate the data with respect to a given lag (on the residuals)) -> maybe not usefull given the previous points?
+    + <s> Identify seasonality and trend from the plots and common sense (tip, si la variance increase, bonne idée de log la time series en elle même (faut faire gaffe car je pense que ça sera négatif donc rip.)) </s>
+    + To remove the trend, one can fit various models to model the mean. Once this model is fitted, we extract its residuals which will be the difference between the time series and the fitted data (sqrd error?) -> >GAM works well for truncated time series
+    + Find the seasonality parameter `s` (To remove seasonality, we can differentiate the data with respect to a given lag (on the residuals)) -> maybe not usefull given the previous points? -> it is 12 (see frequency)
     + Once this is done, we have a residuals (time series) from which we can build a SARIMA model on, and fit its order and parameters with ACF/PACF. (   library(DescTools)) slide 21-22 pour explication générale d'un ARMA si on veut parler un peu + du théorique. Quand on ajoute le S dans ARMA, on ajoute des polynômes de differentiabilité. all parameters are estimated by maximum likelihood using function arima() in R
     + To wrap up : see slide 29
 * Perform residual diagnostics and predictive checking for the candidate
