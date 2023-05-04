@@ -1,0 +1,338 @@
+---
+title: "Project 5 - Climate change using time series"
+author: "Eliott Van Dieren"
+date: "`r Sys.Date()`"
+output: 
+  bookdown::html_document2:
+    theme: united
+    number_sections: true
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(readr)
+library(DescTools)
+library(mgcv) # package for generalized additive models 
+library(forecast)
+library(nlme)
+library(car)
+library(dplyr)
+library(kableExtra)
+```
+
+# Introduction
+
+Climate change has been, for a few decades, an important topic, as this global phenomenon has been affecting the Earth for many years. Scientists around the world try to understand the global warming phenomenon, its causes and try to predict its future trajectory in years to come. In this project, we try to predict global temperature by using time series theory. More precisely, we try to answer two main questions : is there a seasonality in the temperature measures, and what is the form of global warming. To do so, we first start by exploring and transforming the data in [Data exploration], then we try modeling the global trend and its residuals by using Generalized Least Squares and ARMA models in [Modeling the temperature using GLS and ARMA]. Thanks to this model, we can answer the two main questions in [Answering the two main questions]. Additionally, we can now predict the temperature in the future, which is done in [Prediction up to 2050]. In this section, we also compare the GLS model to another model paradigm, which uses Generalized Additive Models and SARIMA models. Lastly, we conclude by stating the take-home messages and further steps that would be interesting to explore in [Conclusion].
+
+# Data exploration
+
+## Dataset Description
+
+The time series which will be used in this project is the temperature anomalies from January 1880 to December 2022. A temperature anomaly is a departure from a global mean value. A positive (negative) anomaly in this time series shows that the temperature was warmer (cooler) than the global mean.
+
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
+
+temperature <- read.csv("Data/temperature.csv",skip = 1,row.names="Year")
+temperature <- temperature[,1:12]
+temp <- as.numeric(unlist(t(temperature)))
+ts_temp <- ts(temp,start=1880,frequency=12)
+
+par(mfrow = c(1, 2))
+plot(ts_temp,
+     main="Temperature anomalies since 1880",
+     xlab = "Years",ylab="Temperature anomalies")
+hist(ts_temp,breaks = 20,density = TRUE)
+
+```
+
+## Dataset transformations
+
+As seen above, one can identify an increasing trend. For prediction purposes, one might only want to focus on recent years. For this reason, we chose to take a subset of the time series, from $1960$ onwards, as one can argue that there is a changing point in the trend around this year, from fluctuating to a more or less linear growth.
+
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
+start_y <- 1960
+ts_temp <- window(ts_temp,start=start_y)
+par(mfrow = c(1, 2))
+plot(ts_temp,
+     main="Truncated temperature anomalies",
+     xlab = "Years",ylab="Temperature anomalies")
+hist(ts_temp,breaks = 20,density = TRUE))
+```
+
+# Modeling the temperature using GLS and ARMA
+
+## Identifying a trend
+
+From the above time-series, one now has to find a model which could fit the increasing trend of the temperature anomalies. In this project, we chose to fit the trend by using a few predictors : a linear, quadratic and exponential term with respect to the years, starting at $1$ from 1960 onwards. Furthermore, we also added months as factors to show monthly seasonality for the temperatures. One can argue that most of the earth’s landmass is in the northern globe, there may be some sort of a seasonal behavior as the global mean would therefore be biased to a northen climate behavior.
+
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
+lmData <- data.frame(y = ts_temp,
+                     month = as.factor(rep(1:12,length(ts_temp)/12)),
+                     t = 1:length(ts_temp))
+
+lmfit <- lm(y~ t + I(t^2) + exp(t/20) + month, data=lmData) # try to transform and do non linear least square but too complicated
+
+par(mfrow = c(1, 2))
+
+plot(ts_temp,
+     main="Temperature anomalies and trend fit",
+     xlab="Years",
+     ylab="Temperature anomalies")
+points(seq(start_y, 2023, length=length(ts_temp)),fitted(lmfit), type="l", col="red")
+
+plot(resid(lmfit), type="l", col="red",
+     main = "Residuals from the fitted trend",
+     xlab = "Years",
+     ylab="Residuals from fitted data")
+
+ts_res <- ts(resid(lmfit),start=start_y,frequency=12)
+```
+
+From this model, we can have a first idea whether seasonality and if there is an exponential growth of the temperature anomalies. To do this, we show several t-tests below for each coefficients.
+
+```{r}
+summary(lmfit)$coefficients %>% 
+  kable(digit=3,caption = "Summary of the basic model") %>% 
+  kable_styling()
+```
+
+As one can see above, we see that coefficients are essentially close to zero, as the values we are trying to plot are usually close to zero, as seen in the histograms above. Furthermore, we observe a strong significance of all transformations of the time, but less significance for the months, except for March, June, September ($0.09$) and July ($0.06$) with p-values in parentheses. However, one big drawdown using this linear model is that we assume that, to use the Gauss-Markov theorem, that the data is iid, which is not the case here. Therefore, we introduce the usage of Generalized Least Squares: 
+
+$$Y = \textbf{X}\beta + \epsilon \text{ with } \epsilon \sim \mathcal{N}(0,\Sigma)$$
+
+where $Y$ is the the temperature anomaly, $X$ is the data matrix (containing the time, its transformation and dummy variables for every month), and $\epsilon$ is the noise following a normal distribution with a covariance $\Sigma \in \mathbb{R}^{N \times N}$, which makes the noise possibly dependant between the $N$ observations. If we knew the covariance matrix $\Sigma$, and if it is invertible, one could define the new problem 
+$$\tilde{Y} = \tilde{\textbf{X}}\beta + \tilde{\epsilon} \text{ with } \tilde{\epsilon} \sim \mathcal{N}(0,I_{N})$$
+
+where $\tilde{Y} = \Sigma^{-\frac{1}{2}}Y$, $\tilde{\mathbf{X}} = \Sigma^{-\frac{1}{2}}\mathbf{X}$, $\tilde{\epsilon} = \Sigma^{-\frac{1}{2}}\epsilon$, which enables us to consider this new data as iid. The goal is therfore to find this matrix $\Sigma$. To do so, we will use the time series theory to model the residuals as an ARMA model, and give this information to a Generalized Least Squares model.
+
+## Finding the ARMA model for the residuals
+
+From the initial fitted linear model described in [Identifying a trend], we got residuals for which we can try to fit an ARMA model on to find the covariance matrix. To do so, we plot the ACF-PACF plots and try to find relevant orders for the $AR(p)$ and $MA(q)$ parts of the model.
+
+```{r}
+ts_red <- resid(lmfit)
+PlotACF(ts_red)
+
+```
+From the above plots, we clearly identify $AR(p=2)$, as there is a clear cut-off of the PACF values after the second lag. For $q$, it is a bit more complicated but one could argue that after the second lag, there is a small drop from $0.55$ to less than $0.4$, we will therefore use this parameter $q=2$. No additional seasonality has been found for the lags which are multiples of $12$ (number of months). Now, one can look at various sub-models from the $ARMA(p=2,q=2)$, and compare AIC and predictive checking to find the best model.
+
+```{r}
+fit_22 <- arima(ts_res, order=c(2,0,2))
+fit_21 <- arima(ts_res, order=c(2,0,1))
+fit_12 <- arima(ts_res, order=c(1,0,2))
+
+cat(c(fit_22$aic,fit_21$aic,fit_12$aic, fit_11$aic))
+
+n <- length(ts_res)
+train <- 1:(n-floor(n/3))
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-step ahead forecast 
+for(j in 0:(floor(n/3)-2)){
+  fit <- arima(ts_res[train+j], order=c(2,0,2))
+  Err[1,j+1] <- sum(ts_res[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_res[train+j], order=c(2,0,1))
+  Err[2,j+1] <- sum(ts_res[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_res[train+j], order=c(1,0,2))
+  Err[3,j+1] <- sum(ts_res[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+}
+rowMeans(Err)
+
+```
+
+From above tests, one finds that the $ARMA(p=2,q=2)$ is better than its submodels. Furthermore, we can check the residuals of the fitted ARMA model, and assert their normality :
+
+```{r}
+acf(fit_22$residuals); pacf(fit_22$residuals)
+
+qqnorm(fit_22$residuals)
+qqline(fit_22$residuals)
+
+```
+Except for the upper-tail, the residuals are close to the diagonal on the Q-Q Plot, and no more lags stand out from the ACF-PACF plots.
+
+## Fitting the GLS model
+
+Now that we have a model for the trend (see [Identifying a trend]) and for its residuals (see [Finding the ARMA model for the residuals]), one can define the GLS model as described above. Hereunder is a summary of the fitted GLS model :
+
+$$ \tilde{Y} =  \beta_0 + \beta_1 t + \beta_2 t^2 + \beta_3 \exp(t) + \epsilon \quad \text{ with } \epsilon \sim ARMA(p=2,q=2) $$
+```{r}
+R_struct <- corARMA(form=~t, p=2,q=2) # ARMA(2,0,2) correlation structure 
+glsfit <- gls(y~t + I(t^2) + exp(t/20) + month, data=lmData, corr=R_struct, method="ML") 
+```
+
+```{r}
+out <- summary(glsfit)
+out$tTable %>%
+  kable(digit=3,caption = "Summary of the GLS model") %>% 
+  kable_styling()
+```
+
+From the above summary, one can check that the coefficients for the quadratic and the exponential term are equal to zero, and that the exponential coefficient is not considered significant with a p-value of $0.12$.
+
+
+
+
+# Answering the two main questions
+
+To answer the two questions, as we can now work with iid transformed data, we can freely use the signifiance tests. Hereunder is an ANOVA Type II test to assert variable importance in the trend model:
+
+```{r}
+Anova(glsfit, type=2) %>% 
+  kable(digit=3,caption = "ANOVA Test-II Table for GLS model") %>% 
+  kable_styling()
+```
+
+
+To confirm what we have seen in the summary of the GLS model, this ANOVA test confirms that the exponential variable is not significant for this model. *We can therefore refute the exponential trend* of the temperature anomalies. Furthermore, we observe a strong significance regarding the `month` factor, meaning that there is seasonality regarding the temperature month per month, even though the collected data should be without seasonality as it is supposed to represent the global temperature around the world. As stated i the introduction, this could be due to more land in the north hemisphere than in the south.
+
+# Prediction up to 2050
+
+
+## Comparison with GAM trend and SARIMA
+
+Instead of working with Generalized Least Square, one can first try to fit the trend with a Generalized Additive model and then find SARIMA parameters for its residuals. This can help us answer the seasonality question based on the parameters found in the SARIMA model for residuals, but does not answer the question regarding the exponential growth. Therefore, this section is considered additional and only gives the reader another way to forecast temperature anomalies, without assessing the two questions.
+
+
+First, we start by defining a Generalized Additive Model for trend fitting. A generalized additive model is a generalized linear model which includes non-linear relationships between variable and the response. The response is given by a sum of smooth functions (usually spline basis functions) of the variables as well as any other GLM-compatible variable. For further details, see [Hastie 1986](https://pdodds.w3.uvm.edu/files/papers/others/1986/hastie1986a.pdf). In our case, we use a GAM model with smoothing function on the time `t`, and we also add the months as factors, to add the monthly seasonality. 
+
+```{r}
+gamfit <- gam(y~s(t)+month, data=lmData)
+plot(ts_temp)
+points(seq(start_y, 2023, length=length(ts_temp)), fitted(gamfit), type="l", col="red")
+plot(resid(gamfit), type="l", col="red")
+``` 
+
+From the residuals, we can apply the same type of analysis than previously done with the linear model residuals in [Identifying a trend]. Hereunder is the ACF-PACF plots from the residuals :
+
+```{r}
+ts_gam <- ts(resid(gamfit),start=start_y,frequency=12)
+PlotACF(ts_gam)
+
+# 10log_10(n) = 28.78522
+# s = 12, so we will check for k=1,2 and thats it
+```
+
+From the ACF plot, we first observe that those are exactly the same as the previous residual analysis. We observe exponential decay, which goes below the significance threshold after the order $5-6$, but no real cut-off. From the PACF, we observe a cutoff after lag $2$. One could therefore think of $p=2$ for the AR part of the ARMA model, and no clear value for $q$, even though we see an important decrease (yet no cut-off) at $q=2$.
+
+
+```{r}
+fit_22 <- arima(ts_gam, order=c(2,0,2))
+acf(fit_22$residuals); pacf(fit_22$residuals)
+
+# Diagnostics 
+qqnorm(fit_22$residuals)
+qqline(fit_22$residuals)
+```
+QQ-Plots seem reasonable, PACF and ACF looks good for white noise. 
+
+Now one can have a look at submodels of the ARMA plot and check whether lower orders for the AR and MA component make sense
+
+```{r}
+
+# Checking from (2,0,2) to submodels
+
+fit_21 <- arima(ts_gam, order=c(2,0,1))
+fit_12 <- arima(ts_gam, order=c(1,0,2))
+fit_11 <- arima(ts_gam, order=c(1,0,1))
+cat(c(fit_22$aic,fit_21$aic,fit_12$aic, fit_11$aic))
+
+#For model comparison, the model with the lowest AIC score is preferred. The absolute values of the AIC scores do not matter. These scores can be negative or positive.  -> fit_22 seem to be the best
+# see screenshot for citation
+
+
+n <- length(ts_gam)
+train <- 1:(n-floor(n/3))
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-step ahead forecast 
+for(j in 0:(floor(n/3)-2)){
+  fit <- arima(ts_gam[train+j], order=c(2,0,3))
+  Err[1,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j], order=c(2,0,2))
+  Err[2,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j], order=c(1,0,2))
+  Err[3,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+}
+rowMeans(Err)
+# 0.03243841 0.03237781 0.03268235
+
+# Both for AIC and rolling -> fit22 seem nice, it also has normal QQplots and residuals are white noise
+
+# Next step : check for PQ (see slides) -> how it behaves to previous months (1 behind, two behind etc?) -> it is not taken into account yet
+fit_22_ts <- resid(fit_22)
+
+
+# On the ts_gam ts
+myacf <- acf(ts_gam, main="ACF with 12k lags in red")
+season_lags <- seq(0,10*log(length(ts_gam),10), by=12)
+points(myacf$lag[1+season_lags], myacf$acf[1+season_lags], col="red", type="h", lwd=1.5)
+mypacf <- pacf(ts_gam)
+points(mypacf$lag[season_lags], mypacf$acf[season_lags], col="red", type="h", lwd=1.5)
+
+
+final_fit <- arima(ts_gam,order=c(2,0,2),seasonal = c(2,0,0))
+sub_final_fit <- arima(ts_gam,order=c(2,0,2),seasonal = c(1,0,0))
+
+c(final_fit$aic,fit_22$aic,sub_final_fit$aic)
+
+n <- length(ts_gam)
+train <- 1:(n-floor(n/3))
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-month ahead forecast 
+for(j in 0:(floor(n/3)-2)){
+  fit <- arima(ts_gam[train+j], order=c(2,0,2))
+  Err[1,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j],order=c(2,0,2),seasonal = c(2,0,0))
+  Err[2,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j],order=c(2,0,2),seasonal = c(1,0,0))
+  Err[3,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+}
+rowMeans(Err)
+# 0.03237781 0.03222906 0.03243106
+
+# So, one sees that the final SARIMA(2,0,2)x(2,0,0) yields both lowest AIC and predictive residuals
+resid_f_fit <- resid(final_fit)
+qqnorm(resid_f_fit)
+qqline(resid_f_fit)
+PlotACF(resid_f_fit)
+```
+So the final model would be SARIMA (2,0,2)x(2,0,0). auto.arima would give us ARIMA(2,0,3)(1,0,0)[12] with zero mean, which is slightly different from what we have found. However, we get lower AIC (-1277.461 vs -1278.698) and lower residual error (0.03222906 vs 0.03252401)
+
+```{r}
+
+auto <- auto.arima(ts_gam)
+
+c(auto$aic,final_fit$aic)
+
+n <- length(ts_gam)
+train <- 1:(n-floor(n/3))
+Err <- array(0,c(3, floor(n/3)-2+1 )) # rolling 2-step ahead forecast 
+for(j in 0:(floor(n/3)-2)){
+  fit <- arima(ts_gam[train+j], order=c(2,0,2))
+  Err[1,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j],order=c(2,0,2),seasonal = c(2,0,0))
+  Err[2,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+  fit <- arima(ts_gam[train+j],order=c(2,0,3),seasonal = c(1,0,0))
+  Err[3,j+1] <- sum(ts_gam[c(1,2) + end(train)[1]+j] - predict(fit, n.ahead=2)$pred)^2
+}
+rowMeans(Err)
+```
+
+
+
+## Forecasting up to 2050
+
+
+```{r}
+fit <- Arima(ts_gam, order=c(2,0,2), seasonal=c(2,0,0)) # capital
+preds <- forecast(fit, 12, c(0.05,0.95))
+plot(preds)
+
+# faire residu + trend
+
+tot_auto <- auto.arima(ts_temp)
+auto_preds <- forecast(tot_auto, 12*10, c(0.05,0.95))
+plot(auto_preds)
+```
+
+# Conclusion

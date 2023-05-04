@@ -59,7 +59,7 @@ lmData <- data.frame(y = ts_temp,
                      month = as.factor(rep(1:12,length(ts_temp)/12)),
                      t = 1:length(ts_temp))
 
-lmfit <- lm(y~ t + I(t^2) + exp(t/20) + month, data=lmData)
+lmfit <- lm(y~ t + I(t^2) + exp(t/20) + month, data=lmData) # try to transform and do non linear least square but too complicated
 plot(ts_temp)
 points(seq(start_y, 2023, length=length(ts_temp)),fitted(lmfit), type="l", col="red")
 plot(resid(lmfit), type="l", col="red")
@@ -135,10 +135,10 @@ Anova(glsfit, type=2)
 
 sig_glsfit <- gls(y~t + I(t^2) + month, data=lmData, corr=R_struct, method="ML")
 
-anova(glsfit,sig_glsfit)
+anova(glsfit,sig_glsfit) # other way around
 ```
 
-From this test, we observe the non-significance of the exponential part of the modeling, and the significance of the linear and quadratic dependance on time. This helps us answering the question regarding the exponential growth of the temperature around the globe : *it is not significant*, one could see that a low quadratic function might work better to fit the model. Furthermore, we observe a strong significance regarding the `month` factor, meaning that there is seasonality regarding the temperature month per month, even though the collected data should be without seasonality as it is supposed to represent the global temperature around the world. This could be due to more measurements made in the north or south hemisphere, which could bias the total mean to a north or south hemisphere seasonal effect.
+From this test, we observe the non-significance of the exponential part of the modeling, and the significance of the linear and quadratic dependance on time. This helps us answering the question regarding the exponential growth of the temperature around the globe : *it is not significant*, one could see that a low quadratic function might work better to fit the model. 
 
 ## Predicting temperature until 2050
 
@@ -157,18 +157,6 @@ ts_pred <- ts(preds,start=2023,frequency = 12)
 plot(ts_pred)
 PlotACF(resid(sig_glsfit))
 ```
-
-
-Questions for Prof :
-
-1) Once I have this gls model, do I still have to redo everything regarding the noise? Seems like yes, but then why did I have to give it a ARMA strucutre?
-
-2) Is it the good methodology? Can I conclude strictly from those anova tests that there is a seasonality and no exponential rate?
-
-3) By adding the months, don't we ourselves add the seasonality?
-
-4) Is the method for GAM correct ? If so, do I do the same by applying GLS ? (refers to 1))
-
 
 
 
