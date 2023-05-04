@@ -60,7 +60,7 @@ par(mfrow = c(1, 2))
 plot(ts_temp,
      main="Truncated temperature anomalies",
      xlab = "Years",ylab="Temperature anomalies")
-hist(ts_temp,breaks = 20,density = TRUE))
+hist(ts_temp,breaks = 20,density = TRUE)
 ```
 
 # Modeling the temperature using GLS and ARMA
@@ -125,7 +125,7 @@ fit_22 <- arima(ts_res, order=c(2,0,2))
 fit_21 <- arima(ts_res, order=c(2,0,1))
 fit_12 <- arima(ts_res, order=c(1,0,2))
 
-cat(c(fit_22$aic,fit_21$aic,fit_12$aic, fit_11$aic))
+cat(c(fit_22$aic,fit_21$aic,fit_12$aic))
 
 n <- length(ts_res)
 train <- 1:(n-floor(n/3))
