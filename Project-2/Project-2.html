@@ -11,7 +11,7 @@
 
 <meta name="author" content="Eliott Van Dieren" />
 
-<meta name="date" content="2023-03-22" />
+<meta name="date" content="2023-05-04" />
 
 <title>Project 2 - e-commerce purchase prediction</title>
 
@@ -1749,7 +1749,7 @@ div.tocify {
 <h1 class="title toc-ignore">Project 2 - e-commerce purchase
 prediction</h1>
 <h4 class="author">Eliott Van Dieren</h4>
-<h4 class="date">2023-03-22</h4>
+<h4 class="date">2023-05-04</h4>
 
 </div>
 
@@ -2166,10 +2166,13 @@ and a BIC of <span class="math inline">\(7584\)</span>.</p>
 <p>The next step is to fit the model containing only the statistically
 significant covariates, which we will call <span class="math inline">\(glm_{sig}\)</span>. With this model, we obtain an
 AUC of <span class="math inline">\(0.8878\)</span>, an AIC of <span class="math inline">\(7145\)</span> and a BIC of <span class="math inline">\(7344\)</span>. All those metrics are slightly
-better than <span class="math inline">\(glm_0\)</span>, even though the
-model-submodel test using the Loglikelihood ratio test has a p-value of
-<span class="math inline">\(0.35\)</span>, as seen on the two tables
-below.</p>
+better than <span class="math inline">\(glm_0\)</span>. Furthermore,
+with <span class="math inline">\(H_0\)</span> being that the predictors
+not contained in the sub-model do not influence the outcome, one can
+check this hypothesis using the likelihood ratio test (model-submodel
+test). We get a p-value of <span class="math inline">\(0.35\)</span>,
+which means that <span class="math inline">\(H_0\)</span> can not be
+rejected and therefore shows that the sub-model is significant.</p>
 <table class="table" style="margin-left: auto; margin-right: auto;">
 <caption>
 ANOVA Test-II Table for <span class="math inline">\(glm_{sig}\)</span>
@@ -2372,7 +2375,7 @@ and <code>n_info_page</code> are slightly non-linear. Hereunder is the
 Anova type-II test regarding those.</p>
 <table class="table" style="margin-left: auto; margin-right: auto;">
 <caption>
-ANOVA Test-II Table for enhanced model
+ANOVA Test-II Table with added non-linearities
 </caption>
 <thead>
 <tr>
@@ -2575,77 +2578,18 @@ I(n_info_page^2)
 </tbody>
 </table>
 <p>With this anova test, one can see that the quadratic dependence on
-product- and admin-related pages are significant, while the one with
-respect to the average of time-product per page and the
-information-related page are not, with respectively a p-value of <span class="math inline">\(0.16\)</span> and <span class="math inline">\(0.9\)</span>, those will therefore be discarded.
+the number of visited product- and admin-related pages are significant,
+while the one with respect to the average of time-product per page and
+the information-related page are not, with respectively a p-value of
+<span class="math inline">\(0.16\)</span> and <span class="math inline">\(0.9\)</span>, those will therefore be discarded.
 Additionally, one can note that the average time per product page is the
 least significant from the remaining covariates, and by checking the
 AUC,AIC and BIC from the model with and without this covariate, one
 obtains better results when dropping it, which we will do. This enhanced
 new model will be called <span class="math inline">\(glm_{en}\)</span>.</p>
-<table class="table" style="margin-left: auto; margin-right: auto;">
-<caption>
-Model-submodel test between <span class="math inline">\(glm_{sig}\)</span> and <span class="math inline">\(glm_{en}\)</span>
-</caption>
-<thead>
-<tr>
-<th style="text-align:right;">
-Resid. Df
-</th>
-<th style="text-align:right;">
-Resid. Dev
-</th>
-<th style="text-align:right;">
-Df
-</th>
-<th style="text-align:right;">
-Deviance
-</th>
-<th style="text-align:right;">
-Pr(&gt;Chi)
-</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:right;">
-11603
-</td>
-<td style="text-align:right;">
-7091.045
-</td>
-<td style="text-align:right;">
-NA
-</td>
-<td style="text-align:right;">
-NA
-</td>
-<td style="text-align:right;">
-NA
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-11600
-</td>
-<td style="text-align:right;">
-6454.713
-</td>
-<td style="text-align:right;">
-3
-</td>
-<td style="text-align:right;">
-636.332
-</td>
-<td style="text-align:right;">
-0
-</td>
-</tr>
-</tbody>
-</table>
 <p>With this enhanced model <span class="math inline">\(glm_{en}\)</span>, we get an AUC of 0.9043 which
-is beating the benchmark. Additionally, it has a AIC of <span class="math inline">\(6515\)</span>, a BIC of <span class="math inline">\(6735\)</span> and a p-value of <span class="math inline">\(0\)</span> for the model-submodel test with <span class="math inline">\(glm_{sig}\)</span>, which shows a great
-amelioration from the previous model by adding nonlinearities.</p>
+is beating the benchmark. Additionally, it has a AIC of <span class="math inline">\(6515\)</span>, a BIC of <span class="math inline">\(6735\)</span>, which show a strong improvement
+from the previous model by adding nonlinearities.</p>
 </div>
 <div id="adding-interactions" class="section level2" number="3.3">
 <h2><span class="header-section-number">3.3</span> Adding
@@ -2670,66 +2614,194 @@ shows the limitations of such tests. For the final model, we chose to
 only keep the interactions <code>page_values:weekend</code> and
 <code>page_values:visitor_type</code>, as those gave better AUC results
 overall. All the covariates used for the final model and their
-respective p-value are listed below, as well as the result of the
-model-submodel test between <span class="math inline">\(glm_{en}\)</span> and <span class="math inline">\(glm_{final}\)</span> with p-value approx. equal to
-<span class="math inline">\(0\)</span>. Regarding the metrics, we obtain
+respective p-value are listed below. Regarding the metrics, we obtain
 <span class="math inline">\(0.905\)</span> for AUC, <span class="math inline">\(6480\)</span> for AIC and <span class="math inline">\(6723\)</span>.</p>
 <table class="table" style="margin-left: auto; margin-right: auto;">
 <caption>
-Model-submodel test between <span class="math inline">\(glm_{en}\)</span> and <span class="math inline">\(glm_{final}\)</span>
+ANOVA Test-II Table with final model
 </caption>
 <thead>
 <tr>
-<th style="text-align:right;">
-Resid. Df
+<th style="text-align:left;">
 </th>
 <th style="text-align:right;">
-Resid. Dev
+LR Chisq
 </th>
 <th style="text-align:right;">
 Df
 </th>
 <th style="text-align:right;">
-Deviance
-</th>
-<th style="text-align:right;">
-Pr(&gt;Chi)
+Pr(&gt;Chisq)
 </th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="text-align:right;">
-11600
+<td style="text-align:left;">
+n_product_page
 </td>
 <td style="text-align:right;">
-6454.713
+42.732
 </td>
 <td style="text-align:right;">
-NA
+1
 </td>
 <td style="text-align:right;">
-NA
-</td>
-<td style="text-align:right;">
-NA
+0.000
 </td>
 </tr>
 <tr>
-<td style="text-align:right;">
-11597
+<td style="text-align:left;">
+exit_rates
 </td>
 <td style="text-align:right;">
-6413.966
+41.036
 </td>
 <td style="text-align:right;">
-3
+1
 </td>
 <td style="text-align:right;">
-40.748
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+page_values
 </td>
 <td style="text-align:right;">
-0
+173042.681
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+month
+</td>
+<td style="text-align:right;">
+228.833
+</td>
+<td style="text-align:right;">
+9
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+traffic_type
+</td>
+<td style="text-align:right;">
+47.593
+</td>
+<td style="text-align:right;">
+11
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+visitor_type
+</td>
+<td style="text-align:right;">
+18.594
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+I(page_values^2)
+</td>
+<td style="text-align:right;">
+169623.238
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+I(page_values^3)
+</td>
+<td style="text-align:right;">
+109214.074
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+I(n_product_page^2)
+</td>
+<td style="text-align:right;">
+9.238
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+0.002
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+I(n_admin_page^2)
+</td>
+<td style="text-align:right;">
+8.996
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+0.003
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+page_values:weekend
+</td>
+<td style="text-align:right;">
+13.891
+</td>
+<td style="text-align:right;">
+1
+</td>
+<td style="text-align:right;">
+0.000
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+page_values:visitor_type
+</td>
+<td style="text-align:right;">
+30.824
+</td>
+<td style="text-align:right;">
+2
+</td>
+<td style="text-align:right;">
+0.000
 </td>
 </tr>
 </tbody>
