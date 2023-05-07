@@ -330,7 +330,7 @@ df_fit %>% kable(caption = "Comparison with or without P-seasonality") %>% kable
 Even though it is not clear from the PACF-ACF plots above, one can try to add the dependance on the lags $12$ and $24$ from the PACF plot, and check whether we obtain better AIC and predictive checking than the basic ARMA(2,2) model, as it is not very expensive to check. One finds that the SARIMA (2,0,2)x(2,0,0)[12] yields better results than the SARIMA(2,0,2)x(1,0,0) and ARIMA(2,0,2), which is the one we will keep. Furthermore, calling `auto.arima` would give us ARIMA(2,0,3)(1,0,0)[12] with zero mean, which is slightly different from what we have found. However, we get lower AIC (-1277.461 vs -1278.698) and lower residual error (0.03222906 vs 0.03252401). We further check the residuals and the QQ-plots for the final SARIMA model
 
 ```{r}
-resid_f_fit <- resid(final_fit)
+resid_f_fit <- resid(big_P_fit)
 par(mfrow = c(1, 2))
 acf(resid_f_fit); pacf(resid_f_fit)
 ```
@@ -344,7 +344,7 @@ qqline(resid_f_fit)
 ```{r}
 auto <- auto.arima(ts_gam)
 
-c(auto$aic,final_fit$aic)
+c(auto$aic,big_P_fit$aic)
 
 n <- length(ts_gam)
 train <- 1:(n-floor(n/3))
