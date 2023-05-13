@@ -26,7 +26,7 @@ library(kableExtra)
 
 # Introduction
 
-Climate change has been, for a few decades, an important topic, as this global phenomenon has been affecting the Earth for many years. Scientists around the world try to understand the global warming phenomenon, its causes and try to predict its future trajectory in years to come. In this project, we try to predict global temperature by using time series theory. More precisely, we try to answer two main questions : is there a seasonality in the temperature measures, and what is the form of global warming. To do so, we first start by exploring and transforming the data in [Data exploration], then we try modeling the global trend and its residuals by using Generalized Least Squares and ARMA models in [Modeling the temperature using GLS and ARMA]. Thanks to this model, we can answer the two main questions (see [Answering the two main questions]). Additionally, we can now predict the temperature in the future, which is done in [Prediction up to 2050]. In this section, we also compare the GLS model to another model paradigm, which uses Generalized Additive Models and SARIMA models. Lastly, we conclude by stating the take-home messages and further steps that would be interesting to explore in [Conclusion].
+Climate change has been, for a few decades, an important topic, as this global phenomenon has been affecting the Earth for many years. Scientists around the world try to understand the global warming phenomenon, its causes and try to predict its future trajectory in years to come. In this project, we try to predict global temperature by using time series theory. More precisely, we try to answer two main questions : is there a seasonality in the temperature measures, and what is the form of global warming. To do so, we first start by exploring and transforming the data in [Data exploration], then we try modeling the global trend and its residuals by using Generalized Least Squares and ARMA models respectively in [Modeling the temperature using GLS and ARMA]. Thanks to this model, we can answer the two main questions (see [Answering the two main questions]). Additionally, we can now predict the temperature in the future, which is done in [Prediction up to $2050$]. Furthermore, we compare the results obtained by fitting the temperatures anomalies with another model paradigm: Generalized Additive Models and SARIMA models and observe the other model's predictions. Lastly, we conclude by stating the take-home messages and further steps that would be interesting to explore in [Conclusion].
 
 # Data exploration
 
@@ -117,7 +117,7 @@ where $Y$ is the the temperature anomaly, $X$ is the data matrix (containing the
 $$\tilde{Y} = \tilde{\textbf{X}}\beta + \tilde{\epsilon} \text{ with } \tilde{\epsilon} \sim \mathcal{N}(0,I_{N})$$
 where $\tilde{Y} = \Sigma^{-\frac{1}{2}}Y$, $\tilde{\mathbf{X}} = \Sigma^{-\frac{1}{2}}\mathbf{X}$, $\tilde{\epsilon} = \Sigma^{-\frac{1}{2}}\epsilon$, which enables us to consider this new data as iid. The goal is therefore to find this matrix $\Sigma$. To do so, we will use the time series theory to model the residuals as an ARMA model, and give this information to a Generalized Least Squares model. This will enable us to use the significance tests and answer the two main questions.
 
-## Finding the ARMA model for the residuals
+## Residuals fitting using ARMA
 
 From the initial fitted linear model described in [Identifying a trend], we obtained residuals from which we can fit an ARMA model, hence finding the covariance matrix. To do so, we plot the ACF-PACF plots and try to find relevant orders for the $AR(p)$ and $MA(q)$ parts of the model.
 
@@ -234,11 +234,13 @@ autoplot(ts_temp,main="Prediction of temperature anomalies up to 2050")+autolaye
 
 As seen above, we observe an uptrend with seasonal effect. One can observe that the noise is not really seen in those predictions. This can be due to the large time frame which is used here, and that when you forecast far from the observed value, the prediction of the noise will tend to its mean, which is zero. Therefore, the only trend that we observe after such an amount of time is the fitted trend. By removing the exponential term we do not observe the negative dampening which happened earlier.
 
-## Comparison with GAM trend and SARIMA
+# Comparison with GAM trend and SARIMA
 
 In this project, we have focused on GLS models in order to create independence in the data and apply significance tests to answer our two main questions. However, one could only be interested in the prediction and not the significance of seasonality or exponential trends. This is why, instead of working with Generalized Least Square, one can try to use other methods to predict the temperature anomalies.
 
-The method presented here consists of fitting the trend with a Generalized Additive model and then find SARIMA parameters for its residuals. This section is considered additional and only gives the reader another way to forecast temperature anomalies, without assessing the two questions. The methods really resemble the one previously presented and lots of analyses are analogous to previous ones, hence the short description of certain results in this section.
+The method presented here consists of fitting the trend with a Generalized Additive model and then find SARIMA parameters for its residuals. This section is considered additional and only gives the reader another way to forecast temperature anomalies, without assessing the two questions. The methods highly resemble the one previously presented and lots of analyses are analogous to previous ones, hence the short description of certain results in this section.
+
+## GAM for trend fitting
 
 First, we start by defining a Generalized Additive Model for trend fitting. A generalized additive model is a generalized linear model which includes non-linear relationships between variable and the response. The response is given by a sum of smooth functions (usually spline basis functions) of the variables as well as any other GLM-compatible variable. For further details, see [Hastie 1986](https://pdodds.w3.uvm.edu/files/papers/others/1986/hastie1986a.pdf). In our case, we use a GAM model with smoothing function on the time `t`, and we also add the months as factors, to add the monthly seasonality.
 
@@ -261,6 +263,8 @@ plot(resid(gamfit), type="l", col="red",
 summary(gamfit)$coefficients %>% as.data.frame(.) %>% mutate_if(is.numeric, funs(as.character(signif(., 3)))) %>%
     kable(digit=3,caption = "Summary of the basic model") %>% kable_styling()
 ```
+
+## SARIMA for residuals
 
 From the residuals, we can apply the same type of analysis than previously done with the linear model residuals in [Identifying a trend]. Hereunder is the ACF-PACF plots from the residuals :
 
@@ -389,6 +393,8 @@ df_fit %>% kable(caption = "Comparison Autoarima vs SARIMA(2,0,2)x(2,0,0)") %>% 
 ```
 
 Lastly, calling `auto.arima` on the GAM residuals would give us ARIMA(2,0,3)(1,0,0)[12] with zero mean, which is slightly different from what we have found. However, we get lower AIC and lower predictive error.
+
+## Prediction up to $2050$
 
 Finally, we can try predicting using this model, by adding the trend model to the noise from the fitted SARIMA model.
 
