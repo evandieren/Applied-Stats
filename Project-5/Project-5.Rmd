@@ -115,7 +115,7 @@ However, one big downside using this linear model is that we assume that the dat
 $$Y = \textbf{X}\beta + \epsilon \text{ with } \epsilon \sim \mathcal{N}(0,\Sigma)$$
 where $Y$ is the the temperature anomaly, $X$ is the data matrix (containing the time, its transformation and dummy variables for every month), and $\epsilon$ is the noise following a normal distribution with a covariance $\Sigma \in \mathbb{R}^{N \times N}$, which makes the noise possibly dependent between the $N$ observations. If we know the covariance matrix $\Sigma$, and if it is invertible, one could define the new problem 
 $$\tilde{Y} = \tilde{\textbf{X}}\beta + \tilde{\epsilon} \text{ with } \tilde{\epsilon} \sim \mathcal{N}(0,I_{N})$$
-where $\tilde{Y} = \Sigma^{-\frac{1}{2}}Y$, $\tilde{\mathbf{X}} = \Sigma^{-\frac{1}{2}}\mathbf{X}$, $\tilde{\epsilon} = \Sigma^{-\frac{1}{2}}\epsilon$, which enables us to consider this new data as iid. The goal is therfore to find this matrix $\Sigma$. To do so, we will use the time series theory to model the residuals as an ARMA model, and give this information to a Generalized Least Squares model. This will enable us to use the significance tests and answer the two main questions.
+where $\tilde{Y} = \Sigma^{-\frac{1}{2}}Y$, $\tilde{\mathbf{X}} = \Sigma^{-\frac{1}{2}}\mathbf{X}$, $\tilde{\epsilon} = \Sigma^{-\frac{1}{2}}\epsilon$, which enables us to consider this new data as iid. The goal is therefore to find this matrix $\Sigma$. To do so, we will use the time series theory to model the residuals as an ARMA model, and give this information to a Generalized Least Squares model. This will enable us to use the significance tests and answer the two main questions.
 
 ## Finding the ARMA model for the residuals
 
@@ -172,7 +172,7 @@ Except for the upper-tail, the residuals are close to the diagonal on the Q-Q Pl
 
 ## Fitting the GLS model and aswering the two main questions
 
-Now that we have a model for the trend (see [Identifying a trend]) and for its residuals (see [Finding the ARMA model for the residuals]), one can define the GLS model as described above, and is written explicitely here:
+Now that we have a model for the trend (see [Identifying a trend]) and for its residuals (see [Finding the ARMA model for the residuals]), one can define the GLS model as described above, and is written explicitly here:
 
 $$ \tilde{Y} =  \beta_0 + \beta_1 t + \beta_2 t^2 + \beta_3 \exp(t) + \beta_{4}M + \epsilon$$
 with $\epsilon \sim ARMA(p=2,q=2)$ and $M$ being the month factor ($\beta_4$ is therefore a vector in $\mathbb{R}^{12}$).
@@ -232,13 +232,13 @@ ts_pred <- ts(preds,start=2023,frequency = 12)
 autoplot(ts_temp,main="Prediction of temperature anomalies up to 2050")+autolayer(ts_pred)
 ```
 
-As seen above, we observe an uptrend with seasonal effect. One can observe that the noise is not really seen in those predictions. This can be due to the large timeframe which is used here, and that when you forecast far from the observed value, the prediction of the noise will tend to its mean, which is zero. Therefore, the only trend that we observe after such an amount of time is the fitted trend. By removing the exponential termn we do not observe the negative dampening which happened earlier.
+As seen above, we observe an uptrend with seasonal effect. One can observe that the noise is not really seen in those predictions. This can be due to the large time frame which is used here, and that when you forecast far from the observed value, the prediction of the noise will tend to its mean, which is zero. Therefore, the only trend that we observe after such an amount of time is the fitted trend. By removing the exponential term we do not observe the negative dampening which happened earlier.
 
 ## Comparison with GAM trend and SARIMA
 
 In this project, we have focused on GLS models in order to create independence in the data and apply significance tests to answer our two main questions. However, one could only be interested in the prediction and not the significance of seasonality or exponential trends. This is why, instead of working with Generalized Least Square, one can try to use other methods to predict the temperature anomalies.
 
-The method presented here consists of fitting the trend with a Generalized Additive model and then find SARIMA parameters for its residuals. This section is considered additional and only gives the reader another way to forecast temperature anomalies, without assessing the two questions. The methods really ressemble the one previously presented and lots of analyses are analogous to previous ones, hence the short description of certain results in this section.
+The method presented here consists of fitting the trend with a Generalized Additive model and then find SARIMA parameters for its residuals. This section is considered additional and only gives the reader another way to forecast temperature anomalies, without assessing the two questions. The methods really resemble the one previously presented and lots of analyses are analogous to previous ones, hence the short description of certain results in this section.
 
 First, we start by defining a Generalized Additive Model for trend fitting. A generalized additive model is a generalized linear model which includes non-linear relationships between variable and the response. The response is given by a sum of smooth functions (usually spline basis functions) of the variables as well as any other GLM-compatible variable. For further details, see [Hastie 1986](https://pdodds.w3.uvm.edu/files/papers/others/1986/hastie1986a.pdf). In our case, we use a GAM model with smoothing function on the time `t`, and we also add the months as factors, to add the monthly seasonality.
 
@@ -273,7 +273,7 @@ PlotACF(ts_gam,
 # s = 12, so we will check for k=1,2 and thats it
 ```
 
-We first observe that those really ressembles the ones studied in the previous residual analysis.From the ACF plot, we observe an exponential decay, which goes below the significance threshold after the order $5-6$, but no real cut-off. From the PACF, we observe a cutoff after lag $2$. One could therefore think of $p=2$ for the AR part of the ARMA model, and no clear value for $q$, even though we see an important decrease (yet no cut-off) at $q=2$.
+We first observe that those really resembles the ones studied in the previous residual analysis.From the ACF plot, we observe an exponential decay, which goes below the significance threshold after the order $5-6$, but no real cut-off. From the PACF, we observe a cutoff after lag $2$. One could therefore think of $p=2$ for the AR part of the ARMA model, and no clear value for $q$, even though we see an important decrease (yet no cut-off) at $q=2$.
 
 
 ```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
@@ -319,7 +319,7 @@ df_fit %>% kable(caption = "Comparison of submodels") %>% kable_styling()
 
 As previously observed, we still obtain better results for the ARMA(p=2,q=2) model. We can now have a further look into yearly seasonality and differentiation, by plotting ACF and PACF with yearly lags in red.
 
-```{r}
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
 
 # Both for AIC and rolling -> fit22 seem nice, it also has normal QQplots and residuals are white noise
 
