@@ -7,9 +7,11 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(fda)
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(tidyverse)
 ```
 
 # Data manipulations
@@ -21,7 +23,7 @@ covid_data <- read_csv("./owid-covid-data.csv")
 
 covid_data <- covid_data %>% filter(continent == 'Europe')
 
-locs <- covid_data %>% group_by(location) %>% summarize(n_na = sum(is.na(total_cases_per_million))/length(total_cases_per_million)) %>% filter(n_na < 0.2) %>% select(location) # removing countries with more than 20% NA values
+locs <- covid_data %>% group_by(location) %>% summarize(n_na = sum(is.na(total_cases_per_million))/length(total_cases_per_million)) %>% filter(n_na < 0.2) %>% dplyr::select(location) # removing countries with more than 20% NA values
 
 # All countries with less than 5 mil people (because they will have the same weights as ones with 60ish mil people like France for PCA, which does not make sense)
 # Also removed Russia and Belarus due to shady reports from the authorities
@@ -29,12 +31,7 @@ remove_countries <- c("Albania","Andorra","Bosnia and Herzegovina","Croatia","Cy
 countries <- locs$location
 countries <- countries[!(countries %in% remove_countries)]
 n_countries <- length(countries)
-data <- covid_data %>% select(c('date','location','new_cases_per_million','total_cases_per_million','new_cases_per_million')) %>% filter(location %in% countries)
-
-for (country in countries) {
-  plot(data[data$location == country,]$date,data[data$location == country,]$new_cases_per_million,type="l",main=country)
-}
-
+data <- covid_data %>% dplyr::select(c('date','location','new_cases_per_million','total_cases_per_million','new_cases_per_million')) %>% filter(location %in% countries)
 ```
 
 ## Finding the starting point and endpoints, and transformations
@@ -59,7 +56,11 @@ for (i in 1:n_countries){
 }
 
 df <- do.call("rbind",list_df) #combine all country dataframes into a single one
+```
 
+
+```{r}
+# log-plot of cases from start-point to end-point
 df %>% group_by(location) %>% 
   ggplot(aes(x = time,  y = log_total_cases_per_million,color = location)) + 
   geom_line() + 
@@ -70,15 +71,110 @@ df %>% group_by(location) %>%
 ## B-Spline Smoothing
 
 ```{r}
+df_matrix <- dplyr::select(df,-c("new_cases_per_million","date")) # new cases not needed anymore
 
+smoothing <- function(df,countries) {
+  # Computing the smoothing of each row in df using BSplines
+  smoothed_list <- list()
+  z <- seq(0,1, length=100)
+  for (i in 1:length(countries)) {
+    df_country <- df[df$location == countries[i],]
+    
+    weekly_times <- c(seq(0, 1, by = 7/length(df_country$time)),1)
+    B <- bsplineS(df_country$time,norder = 6,weekly_times)
+    xi_hat <- ginv(t(B) %*% B) %*% t(B) %*% df_country$log_total_cases_per_million
+    
+    Bplot <- bsplineS(z,norder=6,weekly_times)
+    f_hat <- as.vector(Bplot %*% xi_hat)
+    smoothed_list[[i]] <- f_hat
+  }
+  return(mat <- do.call(rbind, smoothed_list))
+}
+
+df_matrix <- smoothing(df_matrix,countries)
+
+matplot(t(df_matrix),type="l")
 ```
 
-## Taking the log and plotting
+## PCAAAA
+
 ```{r}
-data$total_cases_per_million <- log(data$total_cases_per_million)
+z <- seq(1,100)
+perform_pca <- function(X,z){
+  mu <- colMeans(X) # We substract the mean from X (see slides)
+  X <- sweep(X,2,mu)
+  
+  SVD <- svd(X) # we compute X = UDV^T
+  Scores <- SVD$u %*% diag(SVD$d) # computing (z_{n,j}) = UD 
+  Loadings <- SVD$v # Eigenvectors
 
-data %>% group_by(location) %>% ggplot(aes(x = date,  y = total_cases_per_million,color = location)) + geom_line() + theme(legend.text = element_text(size=5), legend.key.height= unit(0.2, 'cm'),
-        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7))
+  FVE <- SVD$d^2/sum(SVD$d^2) # Fraction of variance explained
+
+  lam <- sqrt(length(z)) # measure change
+  
+  # Plotting
+  op <- par(mfrow=c(3,2),mar=rep(2,4))
+  plot(z, X[1,]+mu,type="l", ylim=range(X+mu), main="Data and the mean")
+  for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  points(z,mu,col=2,lwd=2,type="l")
+  plot(Scores[1,]*sign(sum(Loadings[,1])), Scores[2,]*sign(sum(Loadings[,2])), main="1st vs 2nd PC scores")
+  
+  plot(z,Loadings[,1]*sign(sum(Loadings[,1])),type="l", main=paste0("1st PC (",round(100*FVE[1])," % of var)"))
+  # plot(z, X[1,]+mu,type="l", ylim=range(X+mu))
+  # for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  # points(z,mu,col=2,lwd=2,type="l")
+  # points(z,mu+3*SVD$d[1]/lam*SVD$v[,1],col=2,lwd=2,type="l",lty=2)
+  # points(z,mu-3*SVD$d[1]/lam*SVD$v[,1],col=2,lwd=2,type="l",lty=2)
+  
+  plot(z,Loadings[,2]*sign(sum(Loadings[,2])),type="l", main=paste0("2nd PC (",round(100*FVE[2])," % of var)"))
+  # plot(z, X[1,]+mu,type="l", ylim=range(X+mu))
+  # for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  # points(z,mu,col=2,lwd=2,type="l")
+  # points(z,mu+10*SVD$d[2]/lam*SVD$v[,2],col=2,lwd=2,type="l",lty=2)
+  # points(z,mu-10*SVD$d[2]/lam*SVD$v[,2],col=2,lwd=2,type="l",lty=2)
+  
+  plot(z,Loadings[,3]*sign(sum(Loadings[,3])),type="l", main=paste0("3rd PC (",round(100*FVE[3])," % of var)"))
+  # plot(z, X[1,]+mu,type="l", ylim=range(X+mu))
+  # for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  # points(z,mu,col=2,lwd=2,type="l")
+  # points(z,mu+30*SVD$d[3]/lam*SVD$v[,3],col=2,lwd=2,type="l",lty=2)
+  # points(z,mu-30*SVD$d[3]/lam*SVD$v[,3],col=2,lwd=2,type="l",lty=2)
+  
+  plot(z,Loadings[,4]*sign(sum(Loadings[,4])),type="l", main=paste0("4th PC (",round(100*FVE[4])," % of var)"))
+  # plot(z, X[1,]+mu,type="l", ylim=range(X+mu))
+  # for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  # points(z,mu,col=2,lwd=2,type="l")
+  # points(z,mu+30*SVD$d[4]/lam*SVD$v[,4],col=2,lwd=2,type="l",lty=2)
+  # points(z,mu-30*SVD$d[4]/lam*SVD$v[,4],col=2,lwd=2,type="l",lty=2)
+}
+perform_pca(df_matrix,z)
 ```
 
-## PCA on the matrix
+## Second order derivs
+```{r}
+
+diff_df <- t(diff(t(df_matrix)))/df_matrix[,1:(length(df_matrix[1,])-1)]
+
+diff_df <-t(diff(t(df_matrix)))
+
+#matplot(t(diff_df),type="l")
+
+est_diff <- diff_df[1,]
+plot(1:length(est_diff),est_diff,type="l")
+
+plot(df_matrix[1,],type="l")
+lines(df[df$location=="Austria",]$log_total_cases_per_million)
+
+country_df <- df[df$location=="Austria",]$log_total_cases_per_million
+real_diff <- diff(country_df)/country_df[1:(length(country_df)-1)]
+
+plot(real_diff,type="l")
+lines(1:length(est_diff),est_diff,type="l",col="red")
+
+#plot(df[df$location=="Austria",]$new_cases_per_million,type="l")
+#plot(df[df$location=="Austria",]$log_total_cases_per_million,type="l")
+
+plot(1:length(df[df$location == "Austria",]$new_cases_per_million),df[df$location == "Austria",]$new_cases_per_million,type="l")
+
+perform_pca(diff_df,z[2:length(z)])
+```
