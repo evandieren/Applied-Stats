@@ -1,0 +1,84 @@
+---
+title: "Covid cases in Europe"
+author: "Eliott Van Dieren"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+# Data manipulations
+
+## Removing countries
+
+```{r}
+covid_data <- read_csv("./owid-covid-data.csv")
+
+covid_data <- covid_data %>% filter(continent == 'Europe')
+
+locs <- covid_data %>% group_by(location) %>% summarize(n_na = sum(is.na(total_cases_per_million))/length(total_cases_per_million)) %>% filter(n_na < 0.2) %>% select(location) # removing countries with more than 20% NA values
+
+# All countries with less than 5 mil people (because they will have the same weights as ones with 60ish mil people like France for PCA, which does not make sense)
+# Also removed Russia and Belarus due to shady reports from the authorities
+remove_countries <- c("Albania","Andorra","Bosnia and Herzegovina","Croatia","Cyprus","Estonia","Faeroe Islands","Gibraltar","Guernsey","Iceland","Isle of Man","Jersey","Kosovo","Latvia","Liechtenstein","Lithuania","Luxembourg","Malta","Moldova","Monaco","Montenegro","North Macedonia","San Marino","Slovenia","Vatican","Russia","Belarus")
+countries <- locs$location
+countries <- countries[!(countries %in% remove_countries)]
+n_countries <- length(countries)
+data <- covid_data %>% select(c('date','location','new_cases_per_million','total_cases_per_million','new_cases_per_million')) %>% filter(location %in% countries)
+
+for (country in countries) {
+  plot(data[data$location == country,]$date,data[data$location == country,]$new_cases_per_million,type="l",main=country)
+}
+
+```
+
+## Finding the starting point and endpoints, and transformations
+
+```{r}
+list_df <- list()
+start_dates <- rep(as.Date("2000-01-01"),n_countries)
+end_date <- as.Date("2020-06-01")
+for (i in 1:n_countries){
+  data_country <- data[data$location == countries[i],]
+  start_dates[i] <- data_country$date[which(data_country$total_cases_per_million > 25)[1]]
+  dates <- seq.Date(start_dates[i],end_date,by="day")
+  data_country <- data_country[data_country$date %in% dates,]
+  plot(dates,data_country$new_cases_per_million,main=countries[i],type="l")
+  abline(v=start_dates[i],col="red")
+  abline(v=end_date,col="blue")
+  delta_time <- as.numeric(end_date-start_dates[i])
+  data_country$time <- (0:delta_time)/delta_time
+  data_country$total_cases_per_million <- log(data_country$total_cases_per_million)
+  colnames(data_country)[4] ="log_total_cases_per_million"
+  list_df[[i]] <- data_country
+}
+
+df <- do.call("rbind",list_df) #combine all country dataframes into a single one
+
+df %>% group_by(location) %>% 
+  ggplot(aes(x = time,  y = log_total_cases_per_million,color = location)) + 
+  geom_line() + 
+  theme(legend.text = element_text(size=5), legend.key.height= unit(0.2, 'cm'),
+        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7))
+```
+
+## B-Spline Smoothing
+
+```{r}
+
+```
+
+## Taking the log and plotting
+```{r}
+data$total_cases_per_million <- log(data$total_cases_per_million)
+
+data %>% group_by(location) %>% ggplot(aes(x = date,  y = total_cases_per_million,color = location)) + geom_line() + theme(legend.text = element_text(size=5), legend.key.height= unit(0.2, 'cm'),
+        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7))
+```
+
+## PCA on the matrix
