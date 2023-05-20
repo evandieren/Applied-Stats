@@ -11,7 +11,7 @@
 
 <meta name="author" content="Eliott Van Dieren" />
 
-<meta name="date" content="2023-05-04" />
+<meta name="date" content="2023-05-20" />
 
 <title>Project 3 - Premier League Home Advantage during COVID</title>
 
@@ -1735,7 +1735,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">Project 3 - Premier League Home Advantage during COVID</h1>
 <h4 class="author">Eliott Van Dieren</h4>
-<h4 class="date">2023-05-04</h4>
+<h4 class="date">2023-05-20</h4>
 
 </div>
 
@@ -1987,8 +1987,8 @@ Home
 <pre class="r"><code>prm &lt;- glm(goals ~ team + opponent + home + covid + covid:home - 1,
            data=Data, 
            family=poisson(link=&quot;log&quot;))</code></pre>
-<p>As seen above, we have the response <code>goals</code> which is the number of goals scored by <code>team</code> during a match against <code>opponent</code>. Then, we try to predict this response by using the <code>team</code> and <code>opponent</code> factor, as well as the <code>covid</code> and <code>home</code> indicators previously described. We also add the interaction between <code>covid</code> and <code>home</code> which enables us to more precisely describe the link between the home effect and whether the game was played before, during or after Covid. One notes that we removed any intercept in the model and when comparing this model with some with an intercept but without the team’s indicators, we see that the teams’ coefficients are the one containing this information, and that the coefficients for home and Covid stay approximately the same, which is a good stability property (this can be seen in <a href="#comparison-of-models">Comparison of models</a>).</p>
-<p>The main result from Poisson Regression theory that will be used afterwards is related to the marginal effect of a given variable, meaning that having a look at the coefficients <span class="math inline">\(\beta\)</span>, we help us understand the proportional change in expected frequency. If we let <span class="math inline">\(x=(x_1,...,x_p)^T\)</span> and <span class="math inline">\(\tilde{x}(j)=(x_1,...,x_{j−1},x_j+1,x_{j+1},...,x_p)^T\)</span>, then <span class="math inline">\(\exp(\beta_j) = \frac{\mathbb{E}[Y_n |X_n = \tilde{x}(j)]}{\mathbb{E}[Y_n|X_n=x]}\)</span>, meaning that <span class="math inline">\(\exp(\beta_j)\)</span> is the expected change in the response when the j-th variable increases by one. This is particularly interesting when looking at our factors <code>home</code> and <code>covid</code> and their interactions as computing the exponential of their respective coefficients will give us insight about how the number of expected goals change when those factors are equal to zero or one.</p>
+<p>As seen above, we have the response <code>goals</code> which is the number of goals scored by <code>team</code> during a match against <code>opponent</code>. Then, we try to predict this response by using the <code>team</code> and <code>opponent</code> factor, as well as the <code>covid</code> and <code>home</code> indicators previously described. We also add the interaction between <code>covid</code> and <code>home</code> which enables us to more precisely describe the link between the home effect and whether the game was played before, during or after Covid. One notes that we removed any intercept in the model and when comparing this model with some with an intercept but without the team’s indicators, we see that the teams’ coefficients are the one containing this information, and that the coefficients for home and Covid stay approximately the same, which is a good stability property (this can be seen in <a href="#comparison-of-models">Comparison of models</a>)<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>.</p>
+<p>The main result from Poisson Regression theory that will be used afterwards is related to the marginal effect of a given variable, meaning that having a look at the coefficients <span class="math inline">\(\beta\)</span>, we help us understand the proportional change in expected frequency. If we let <span class="math inline">\(x=(x_1,...,x_p)^T\)</span> and <span class="math inline">\(\tilde{x}(j)=(x_1,...,x_{j−1},x_j+1,x_{j+1},...,x_p)^T\)</span>, then <span class="math inline">\(\exp(\beta_j) = \frac{\mathbb{E}[Y_n |X_n = \tilde{x}(j)]}{\mathbb{E}[Y_n|X_n=x]}\)</span>, meaning that <span class="math inline">\(\exp(\beta_j)\)</span> is the expected change in the response when the j-th variable increases by one. This is particularly interesting when looking at our factors <code>home</code> and <code>covid</code> and their interactions as computing the exponential of their respective coefficients will give us insight about how the number of expected goals change when those factors are active or inactive.</p>
 </div>
 </div>
 <div id="did-home-advantage-persist-through-covid" class="section level1" number="4">
@@ -3994,6 +3994,12 @@ Pr(&gt;|z|)
 </table>
 <p>Fortunately, it does not. It has therefore been decided to not have an intercept in this model, as it is not necessary for the analyses in this project.</p>
 </div>
+</div>
+<div class="footnotes footnotes-end-of-document">
+<hr />
+<ol>
+<li id="fn1"><p>After discussions with Dr. Masak, he pointed out that removing an intercept is almost always a bad idea, as it makes the coefficients biased, and one has no real theoretical justifications to ask the model to cross the origin (here the log of the number of goals). Knowing this, I should have kept the intercept in the model.<a href="#fnref1" class="footnote-back">↩︎</a></p></li>
+</ol>
 </div>
 
 
