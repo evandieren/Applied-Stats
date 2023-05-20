@@ -20,7 +20,7 @@ bp <- barplot(height = snow_particles$n_snow_bin/n_particules,
               xlim = c(breakpoints[1], breakpoints[length(breakpoints)]), 
               #ylim = c(0, max(snow_particles$n_snow_bin) * 1.1), 
               xlab = "Snowflakes diameter", 
-              ylab = "Number of snowflakes",
+              ylab = "Snowflakes distribution",
               main = "Snowflake distribution",
               cex.axis = 1,cex.names = 0.8)
 axis(side=1, at =bp,label=snow_particles$startpoint,cex.axis = 1)
