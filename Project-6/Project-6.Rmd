@@ -1,0 +1,132 @@
+---
+title: "Functional Data Analyis for Covid in Europe"
+author: "Eliott Van Dieren"
+date: "`r Sys.Date()`"
+output: 
+  bookdown::html_document2:
+    theme: united
+    number_sections: true
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(fda)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+```
+
+# Introduction
+
+Since early 2020, COVID-19 has had a profound impact on the entire world. Scientists tried to analyse the various death, cases and hospitalization curves to protect the population via different sanitary methods such as lockdowns, social distancing and mask wearing. Those methods were put in place in order to "flatten the curve", and avoid peaks of population in hospitals. 
+
+In this project, we focus on the first wave in European countries, and more precisely on the curve of covid cases across those countries. From those curves, we try to find main trends and common patterns in the 1st wave curves. Practically, this can be done using PCA where principal components are functions and each curve will be a linear combination of those functions.
+
+Regarding the plan of this project, we first start by a description of the dataset and basic transformations. Second, we explore B-Splines smoothing and prepare our data for the PCA computation, which will be the third section of this report. Lastly, we conclude by reporting the take-home messages and next steps which could be done after this project. I want to point out that the majority of the reflection on this project has been made with Candice Baud, another Applied Stats student at EPFL. However, the writing of the report and the coding parts are individual work.
+
+# Data exploration
+
+## Dataset Description
+
+The [dataset](https://github.com/owid/covid-19-data/blob/master/public/data/owid-covid-data.csv) used in this project is made of worldwide daily data about the covid pandemic. Each row describe more than $50$ covid-related variables for a given day, in a given country. As the dataset contains $67$ columns, we will only describe the ones we will use in this project.
+
+* `continent`:  Continent of the daily observation
+* `location`: Country name
+* `date`: Date of the measurements
+* `new_cases_per_million`: Number of new covid cases per million of habitants at `date` in `location`
+* `total_cases_per_million`: Cumulative number of covid cases per million of habitants up to `date`
+
+```{r}
+covid_data <- read_csv("./owid-covid-data.csv")
+
+covid_data <- covid_data %>% filter(continent == 'Europe')
+
+locs <- covid_data %>% group_by(location) %>% summarize(n_na = sum(is.na(total_cases_per_million))/length(total_cases_per_million)) %>% filter(n_na < 0.2) %>% dplyr::select(location) # removing countries with more than 20% NA values
+
+# All countries with less than 5 mil people (because they will have the same weights as ones with 60ish mil people like France for PCA, which does not make sense)
+# Also removed Russia and Belarus due to shady reports from the authorities
+remove_countries <- c("Albania","Andorra","Bosnia and Herzegovina","Croatia","Cyprus","Estonia","Faeroe Islands","Gibraltar","Guernsey","Iceland","Isle of Man","Jersey","Kosovo","Latvia","Liechtenstein","Lithuania","Luxembourg","Malta","Moldova","Monaco","Montenegro","North Macedonia","San Marino","Slovenia","Vatican","Russia","Belarus")
+countries <- locs$location
+countries <- countries[!(countries %in% remove_countries)]
+n_countries <- length(countries)
+data <- covid_data %>% dplyr::select(c('date','location','new_cases_per_million','total_cases_per_million')) %>% filter(location %in% countries)
+```
+From all European countries, we decided to remove the ones with a population less than five million people. This is justified as we are working with cases per million, and therefore each country will further down have the same weight. However, we think that a country like France with more than 65 million people should not be compared with a country like Luxembourg which only has 640 thousands citizens. We further removed Belarus and Russia due to polemical covid cases reports from the authorities. Lastly, we removed all countries which had more than five percent of missing values in `total_cases_per_million`. With all those removals, we went from $51$ countries to $24$.
+
+## Data transformation
+
+With those $24$ remaining countries, we can now try to find the first wave of covid in each of them. To do so, we first found for each country, the date when the total number of cases per million exceeded $25$ people. Then, we found when looking at various articles, that the first wave in Europe finished around the start of June $2020$. Therefore, we got for each country, a starting date and an end date (first of June $2020$). Hereunder the new cases per million of people are plotted, for each country from their start date to the first of June 2020.
+
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
+list_df <- list()
+start_dates <- rep(as.Date("2000-01-01"),n_countries)
+end_date <- as.Date("2020-06-01")
+par(mfrow = c(1, 4))
+for (i in 1:n_countries){
+  data_country <- data[data$location == countries[i],]
+  start_dates[i] <- data_country$date[which(data_country$total_cases_per_million > 25)[1]]
+  dates <- seq.Date(start_dates[i],end_date,by="day")
+  data_country <- data_country[data_country$date %in% dates,]
+  plot(dates,data_country$new_cases_per_million,main=countries[i],type="l")
+  abline(v=start_dates[i],col="red")
+  abline(v=end_date,col="blue")
+  delta_time <- as.numeric(end_date-start_dates[i])
+  data_country$time <- (0:delta_time)/delta_time
+  data_country$total_cases_per_million <- log(data_country$total_cases_per_million)
+  colnames(data_country)[4] ="log_total_cases_per_million"
+  list_df[[i]] <- data_country
+}
+
+df <- do.call("rbind",list_df) #combine all country dataframes into a single one
+
+```
+
+As seen above, we check that it matches quite nicely all the first waves of the pandemic, which is nice. However, as each country has a different starting date, the curves plotted above do not have the same length, which is a necessary property to apply PCA. Therefore, we will use in the next section a b-spline smoothing in order to solve this issue.
+
+```{r}
+df %>% group_by(location) %>% 
+  ggplot(aes(x = time,  y = log_total_cases_per_million,color = location)) + 
+  geom_line() + 
+  theme(legend.text = element_text(size=5), legend.key.height= unit(0.2, 'cm'),
+        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7))
+```
+
+# B-Spline smoothing
+
+In this section, we will use a b-spline basis and fit it to each curve to smoothen it and make it the length we want. Before using splines, we first had to remap the starting date to time zero and end date to $1$, with a linear mapping, which projects all the lines on the same domain $[0,1]$.
+
+Mathematically, TODO (see slide)
+
+
+Practically, we chose b-splines of order six, as we want the speed and acceleration of covid cases to be modeled by b-splines of order three (at least). We also selected weekly nodes instead of the original daily nodes as it created too much fluctuations when reaching $t=1$.
+
+```{r}
+df_matrix <- dplyr::select(df,-c("new_cases_per_million","date")) # new cases not needed anymore
+
+smoothing <- function(df,countries) {
+  # Computing the smoothing of each row in df using BSplines
+  smoothed_list <- list()
+  z <- seq(0,1, length=100)
+  for (i in 1:length(countries)) {
+    df_country <- df[df$location == countries[i],]
+    
+    weekly_times <- c(seq(0, 1, by = 7/length(df_country$time)),1)
+    B <- bsplineS(df_country$time,norder = 6,weekly_times)
+    xi_hat <- ginv(t(B) %*% B) %*% t(B) %*% df_country$log_total_cases_per_million
+    
+    Bplot <- bsplineS(z,norder=6,weekly_times)
+    f_hat <- as.vector(Bplot %*% xi_hat)
+    smoothed_list[[i]] <- f_hat
+  }
+  return(mat <- do.call(rbind, smoothed_list))
+}
+
+df_matrix <- smoothing(df_matrix,countries)
+
+matplot(t(df_matrix),type="l")
+```
