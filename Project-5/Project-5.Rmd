@@ -26,7 +26,7 @@ library(kableExtra)
 
 # Introduction
 
-Climate change has been, for a few decades, an important topic, as this global phenomenon has been affecting the Earth for many years. Scientists around the world try to understand the global warming phenomenon, its causes and try to predict its future trajectory in years to come. In this project, we try to predict global temperature by using time series theory. More precisely, we try to answer two main questions : is there a seasonality in the temperature measures, and what is the form of global warming. To do so, we first start by exploring and transforming the data in [Data exploration], then we try modeling the global trend and its residuals by using Generalized Least Squares and ARMA models respectively in [Modeling the temperature using GLS and ARMA]. Thanks to this model, we can answer the two main questions (see [Answering the two main questions]). Additionally, we can now predict the temperature in the future, which is done in [Prediction up to $2050$]. Furthermore, we compare the results obtained by fitting the temperatures anomalies with another model paradigm: Generalized Additive Models and SARIMA models and observe the other model's predictions. Lastly, we conclude by stating the take-home messages and further steps that would be interesting to explore in [Conclusion].
+Climate change has been, for a few decades, an important topic, as this global phenomenon has been affecting the Earth for many years. Scientists around the world try to understand the global warming phenomenon, its causes and try to predict its future trajectory for years to come. In this project, we try to predict global temperature by using time series theory. More precisely, we try to answer two main questions : is there a seasonality in the temperature measures, and what is the form of global warming. To do so, we first start by exploring and transforming the data in [Data exploration], then we try modeling the global trend and its residuals by using Generalized Least Squares and ARMA models respectively in [Modeling the temperature using GLS and ARMA]. Thanks to this model, we can answer the two main questions (see [Answering the two main questions]) and create predictions up to $2050$. Furthermore, we compare the results obtained by fitting the temperatures anomalies with another model paradigm: Generalized Additive Models and SARIMA models and observe the other model's predictions. Lastly, we conclude by stating the take-home messages and further steps that would be interesting to explore in [Conclusion].
 
 # Data exploration
 
@@ -172,7 +172,7 @@ Except for the upper-tail, the residuals are close to the diagonal on the Q-Q Pl
 
 ## Fitting the GLS model and aswering the two main questions
 
-Now that we have a model for the trend (see [Identifying a trend]) and for its residuals (see [Finding the ARMA model for the residuals]), one can define the GLS model as described above, and is written explicitly here:
+Now that we have a model for the trend (see [Identifying a trend]) and for its residuals, one can define the GLS model as described above, and is written explicitly here:
 
 $$ \tilde{Y} =  \beta_0 + \beta_1 t + \beta_2 t^2 + \beta_3 \exp(t) + \beta_{4}M + \epsilon$$
 with $\epsilon \sim ARMA(p=2,q=2)$ and $M$ being the month factor ($\beta_4$ is therefore a vector in $\mathbb{R}^{12}$).
@@ -195,7 +195,7 @@ Anova(glsfit,type=2) %>%
 
 From the above summary, we observe similar results from the original basic linear model, except for the significance of the exponential coefficient, with a p-value of $0.12$. Thanks to this summary, we can now answer the two main questions :
 
-First, we still observe the negative effect of the exponential term, with a negative coefficient of $-7.53e-18$, which is quite low due to the values of the exponential which grows rapidly with respect to time. Therefore, one can logically refute the exponential positive trend of the temperature anomalies, as the exponential term is used to damper the linear and quadratic part of the model instead of increasing it. The quadratic part is essentially used at the start of $1960$, as one can observe in previous fitted trends above.
+First, we still observe the negative effect of the exponential term, with a negative coefficient of $-7.53*10^{18}$, which is quite low due to the values of the exponential which grows rapidly with respect to time. Therefore, one can logically refute the exponential positive trend of the temperature anomalies, as the exponential term is used to damper the linear and quadratic part of the model instead of increasing it. The quadratic part is essentially used at the start of $1960$, as one can observe in previous fitted trends above.
 
 Regarding seasonality, we observe in the ANOVA test type 2 that the `month` factor has a strong significance, meaning that there is seasonality regarding the temperature month per month. As noted in the introduction, this could be due to more land in the north hemisphere than in the south.
 
@@ -260,7 +260,7 @@ plot(resid(gamfit), type="l", col="red",
 ```
 
 ```{r}
-summary(gamfit)$coefficients %>% as.data.frame(.) %>% mutate_if(is.numeric, funs(as.character(signif(., 3)))) %>%
+summary(gamfit)$p.table %>% as.data.frame(.) %>% mutate_if(is.numeric, funs(as.character(signif(., 3)))) %>%
     kable(digit=3,caption = "Summary of the basic model") %>% kable_styling()
 ```
 
