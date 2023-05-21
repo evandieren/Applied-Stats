@@ -23,11 +23,11 @@ library(tidyverse)
 
 # Introduction
 
-Since early 2020, COVID-19 has had a profound impact on the entire world. Scientists tried to analyse the various death, cases and hospitalization curves to protect the population via different sanitary methods such as lockdowns, social distancing and mask wearing. Those methods were put in place in order to "flatten the curve", and avoid peaks of population in hospitals. 
+Since early 2020, COVID-19 has had a profound impact on the entire world. Scientists tried to analyse the various death, cases and hospitalization curves to protect the population via different sanitary measures such as lockdowns, social distancing and mask wearing. Those methods were put in place in order to "flatten the curve", and avoid peaks of population in hospitals. 
 
-In this project, we focus on the first wave in European countries, and more precisely on the curve of covid cases across those countries. From those curves, we try to find main trends and common patterns in the 1st wave curves. Practically, this can be done using PCA where principal components are functions and each curve will be a linear combination of those functions.
+In this project, we focus on the first wave in European countries, and more precisely on the curve of covid cases across those countries. From those curves, we try to find main trends and common patterns. Practically, this can be done using Functional Data Analysis (FDA), and more precisely PCA where principal components are functions and each curve will be a linear combination of those functions.
 
-Regarding the plan of this project, we first start by a description of the dataset and basic transformations. Second, we explore B-Splines smoothing and prepare our data for the PCA computation, which will be the third section of this report. Lastly, we conclude by reporting the take-home messages and next steps which could be done after this project. I want to point out that the majority of the reflection on this project has been made with Candice Baud, another Applied Stats student at EPFL. However, the writing of the report and the coding parts are individual work.
+Regarding the plan of this project, we first start by a description of the dataset and basic transformations. Second, we explore B-Splines smoothing and prepare our data for the PCA computation, which will be the third section of this report. Lastly, we conclude by reporting the take-home messages and next steps. I want to point out that the majority of the reflection on this project has been made with Candice Baud, another Applied Stats student at EPFL. However, the writing of the report and the coding parts are individual work.
 
 # Data exploration
 
@@ -38,8 +38,8 @@ The [dataset](https://github.com/owid/covid-19-data/blob/master/public/data/owid
 * `continent`:  Continent of the daily observation
 * `location`: Country name
 * `date`: Date of the measurements
-* `new_cases_per_million`: Number of new covid cases per million of habitants at `date` in `location`
-* `total_cases_per_million`: Cumulative number of covid cases per million of habitants up to `date`
+* `new_cases_per_million`: Number of new covid cases per million of citizens at `date` in `location`
+* `total_cases_per_million`: Cumulative number of covid cases per million of citizens up to `date` in `location`
 
 ```{r}
 covid_data <- read_csv("./owid-covid-data.csv")
@@ -56,11 +56,19 @@ countries <- countries[!(countries %in% remove_countries)]
 n_countries <- length(countries)
 data <- covid_data %>% dplyr::select(c('date','location','new_cases_per_million','total_cases_per_million')) %>% filter(location %in% countries)
 ```
-From all European countries, we decided to remove the ones with a population less than five million people. This is justified as we are working with cases per million, and therefore each country will further down have the same weight. However, we think that a country like France with more than 65 million people should not be compared with a country like Luxembourg which only has 640 thousands citizens. We further removed Belarus and Russia due to polemical covid cases reports from the authorities. Lastly, we removed all countries which had more than five percent of missing values in `total_cases_per_million`. With all those removals, we went from $51$ countries to $24$.
+From all European countries, we decided to remove the ones with a population less than five million people. This is justified as we are working with cases per million, and therefore each country will further down have the same weight. However, we think that a country like France with more than 65 million people should not be compared with a country like Luxembourg which only has 640 thousands citizens. We further removed Belarus and Russia due to polemical covid cases reports from the authorities. Lastly, we removed all countries which had more than five percent of missing values in `total_cases_per_million`. With all those removals, we went from $51$ countries to $24$. Hereunder is a plot of the logged cumulative number of covid cases for each country.
+
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
+data %>% group_by(location) %>% 
+  ggplot(aes(x = date,  y = log(total_cases_per_million),color = location)) + 
+  geom_line() + 
+  theme(legend.text = element_text(size=5), legend.key.height= unit(0.2, 'cm'),
+        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7))
+```
 
 ## Data transformation
 
-With those $24$ remaining countries, we can now try to find the first wave of covid in each of them. To do so, we first found for each country, the date when the total number of cases per million exceeded $25$ people. Then, we found when looking at various articles, that the first wave in Europe finished around the start of June $2020$. Therefore, we got for each country, a starting date and an end date (first of June $2020$). Hereunder the new cases per million of people are plotted, for each country from their start date to the first of June 2020.
+With those $24$ remaining countries, we can now try to find the first wave of covid in each of them. To do so, we first computed for each country, the date when the total number of cases per million exceeded $25$ people (arbitrary but ended with good results). Then, we found when looking at various articles, that the first wave in Europe finished around the start of June $2020$. Therefore, we got for each country, a starting date and an end date (first of June $2020$). Hereunder the new cases per million of people are plotted, for each country from their start date to the first of June 2020.
 
 ```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
 list_df <- list()
@@ -86,26 +94,17 @@ df <- do.call("rbind",list_df) #combine all country dataframes into a single one
 
 ```
 
-As seen above, we check that it matches quite nicely all the first waves of the pandemic, which is nice. However, as each country has a different starting date, the curves plotted above do not have the same length, which is a necessary property to apply PCA. Therefore, we will use in the next section a b-spline smoothing in order to solve this issue.
-
-```{r}
-df %>% group_by(location) %>% 
-  ggplot(aes(x = time,  y = log_total_cases_per_million,color = location)) + 
-  geom_line() + 
-  theme(legend.text = element_text(size=5), legend.key.height= unit(0.2, 'cm'),
-        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7))
-```
+As seen above, we check that it matches quite nicely all the first waves of the pandemic, which is what we wanted. However, as each country has a different starting date, the curves plotted above do not have the same length, which is a necessary property to apply PCA. Therefore, we will use in the next section a B-Spline smoothing in order to solve this issue, as well as having nice differentiation properties.
 
 # B-Spline smoothing
 
-In this section, we will use a b-spline basis and fit it to each curve to smoothen it and make it the length we want. Before using splines, we first had to remap the starting date to time zero and end date to $1$, with a linear mapping, which projects all the lines on the same domain $[0,1]$.
+In this section, we will use a b-spline basis and fit it to each curve to smooth it and make it the length we want. Before using splines, we first had to remap the starting date to time zero and end date to $1$, with a linear mapping, which projects all the lines on the same domain $[0,1]$.
 
-Mathematically, TODO (see slide)
+Mathematically, we can describe the B-Spline smoothing following [T. Masak - Functional Data Analysis](https://github.com/TMasak/AppStat/blob/main/Slides/11_functional_data.pdf). For a given country, let $\{y_i\}_{i=1,...,n}$ be noisy values of a function $f$ (which is the covid curve function in our case), evaluated at $\{x_i\}_{i=1,...,n} \in [0,T]$, the days in our case. Furthermore, let $\{\beta_i(x)\}_{i=1,...,q}$ be a set of basis functions chosen such that one can approximate $$y(x) = \sum_{i=1}^q\xi_j \beta_j(x)$$. Then, by defining the optimization problem to find the $\xi$'s, as $$\min_\xi \|y-B\xi\|_2^2, \text{ where } B = (\beta_j(x_n)),$$ we get $\hat{\xi} = (B^TB)^\dagger B^Ty$. Now, for a given set of evaluation points $\{z_i\}_{i=1,...,M}$, one gets $(f(z_1),f(z_2),...,f(z_M))^T = \tilde{B}\hat{\xi}$ where $\tilde{B} = (\beta_j(z_i))$.
 
+Practically, we chose b-splines of order six, as we want the speed and acceleration of covid cases to be modeled by b-splines of order three (at least), which are derivatives of the original b-spline. We also set $\{z_i\}_{i=1,...,M}$ as the weekly nodes instead of the original daily nodes as it created too much fluctuations when reaching $t=1$.
 
-Practically, we chose b-splines of order six, as we want the speed and acceleration of covid cases to be modeled by b-splines of order three (at least). We also selected weekly nodes instead of the original daily nodes as it created too much fluctuations when reaching $t=1$.
-
-```{r}
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
 df_matrix <- dplyr::select(df,-c("new_cases_per_million","date")) # new cases not needed anymore
 
 smoothing <- function(df,countries) {
@@ -125,8 +124,92 @@ smoothing <- function(df,countries) {
   }
   return(mat <- do.call(rbind, smoothed_list))
 }
-
 df_matrix <- smoothing(df_matrix,countries)
+colnames(df_matrix) <- seq(0,1, length=100)
+matplot(colnames(df_matrix), t(df_matrix), type='l', xlab='time', ylab='Smoothes cumulative covid cases', col=1:24,main="Smoothed log-cumulative cases per country")
+legend('bottomright',legend=countries,col=1:24,fill = 1:24, ncol = 4,cex = 0.75)
+```
 
-matplot(t(df_matrix),type="l")
+Now that we have those smoothed functions, with the same number of evaluations, we can start applying functional PCA and interpret the principal components.
+
+# Functional PCA
+
+In this section, we apply Functional PCA on the $24 \times 100$ matrix previously computed, and extract its principal components.
+
+Mathematically, let a given random sample $\{X_i\}_{i=1,...,N}$ with $X_i \in \mathbb{R}^p$ such that $\mathbb{E}[X_1^2]$.  We define $\hat{\mu} = \frac{1}{N} \sum_{i=1}^N X_i \in \mathbb{R}^p$ and $\hat{C} = \frac{1}{N} \sum_{i=1}^N (X_i-\hat{\mu})(X_i-\hat{\mu})^T$. By eigendecomposition, we get $\hat{C} = \sum_{i=j}^{p \wedge N} \hat{\lambda}_j\hat{e}_j\hat{e}_j^T$. Now, for each sample, define $z_{i,j} = \hat{e}_j^T(X_i-\hat{\mu})$ which gives us $$X_i = \hat{\mu} + \sum_{j=1}^{p \wedge N} z_{i,j}\hat{e}_j.$$ In practice, the process is as follows:
+
+* Define $\tilde{X} := X - \hat{\mu} \in \mathbb{R}^{N \times p}$.
+* Apply Singular Value Decomposition on $\tilde{X}$ such that $\tilde{X} = UDV^T$.
+* Then, one gets $\hat{e}_j = V_{:,j}$ and $(z_{i,j})_{i,j} = UD$ are the scores.
+
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
+z <- seq(1,100)
+perform_pca <- function(X,z){
+  mu <- colMeans(X) # We substract the mean from X (see slides)
+  X <- sweep(X,2,mu)
+  
+  SVD <- svd(X) # we compute X = UDV^T
+  Scores <- SVD$u %*% diag(SVD$d) # computing (z_{n,j}) = UD 
+  Loadings <- SVD$v # Eigenvectors
+
+  FVE <- SVD$d^2/sum(SVD$d^2) # Fraction of variance explained
+
+  lam <- sqrt(length(z)) # measure change
+  
+  # Plotting
+  op <- par(mfrow=c(3,2),mar=rep(2,4))
+  plot(z, X[1,]+mu,type="l", ylim=range(X+mu), main="Data and the mean")
+  for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  points(z,mu,col=2,lwd=2,type="l")
+  
+  plot(Scores[1,]*sign(sum(Loadings[,1])), Scores[2,]*sign(sum(Loadings[,2])), main="1st vs 2nd PC scores",ylim=c(-10,2))
+  
+  plot(z,Loadings[,1]*sign(sum(Loadings[,1])),type="l", main=paste0("1st PC (",round(100*FVE[1])," % of var)"))
+  # plot(z, X[1,]+mu,type="l", ylim=range(X+mu))
+  # for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  # points(z,mu,col=2,lwd=2,type="l")
+  # points(z,mu+3*SVD$d[1]/lam*SVD$v[,1],col=2,lwd=2,type="l",lty=2)
+  # points(z,mu-3*SVD$d[1]/lam*SVD$v[,1],col=2,lwd=2,type="l",lty=2)
+  
+  plot(z,Loadings[,2]*sign(sum(Loadings[,2])),type="l", main=paste0("2nd PC (",round(100*FVE[2])," % of var)"))
+  # plot(z, X[1,]+mu,type="l", ylim=range(X+mu))
+  # for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  # points(z,mu,col=2,lwd=2,type="l")
+  # points(z,mu+10*SVD$d[2]/lam*SVD$v[,2],col=2,lwd=2,type="l",lty=2)
+  # points(z,mu-10*SVD$d[2]/lam*SVD$v[,2],col=2,lwd=2,type="l",lty=2)
+  
+  plot(z,Loadings[,3]*sign(sum(Loadings[,3])),type="l", main=paste0("3rd PC (",round(100*FVE[3])," % of var)"))
+  # plot(z, X[1,]+mu,type="l", ylim=range(X+mu))
+  # for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  # points(z,mu,col=2,lwd=2,type="l")
+  # points(z,mu+30*SVD$d[3]/lam*SVD$v[,3],col=2,lwd=2,type="l",lty=2)
+  # points(z,mu-30*SVD$d[3]/lam*SVD$v[,3],col=2,lwd=2,type="l",lty=2)
+  
+  plot(z,Loadings[,4]*sign(sum(Loadings[,4])),type="l", main=paste0("4th PC (",round(100*FVE[4])," % of var)"))
+  # plot(z, X[1,]+mu,type="l", ylim=range(X+mu))
+  # for(n in 1:dim(X)[1]) points(z, X[n,]+mu,type="l")
+  # points(z,mu,col=2,lwd=2,type="l")
+  # points(z,mu+30*SVD$d[4]/lam*SVD$v[,4],col=2,lwd=2,type="l",lty=2)
+  # points(z,mu-30*SVD$d[4]/lam*SVD$v[,4],col=2,lwd=2,type="l",lty=2)
+  return(c(Scores[1,]*sign(sum(Loadings[,1])), Scores[2,]*sign(sum(Loadings[,2]))))
+}
+out <- perform_pca(df_matrix,z)
+```
+
+
+```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
+gdp_2019 <- c(
+  455.032, 534.261, 67.038, 246.938, 355.770, 267.289, 2715.518, 3861.124, 
+  209.853, 164.848, 385.034, 1854.763, 914.883, 403.180, 595.145, 238.359, 
+  250.670, 54.874, 105.153, 1394.119, 530.155, 703.080, 153.609, 2827.110
+)
+df <- data.frame(
+  pc1_scores = out[1:24],
+  pc2_scores = out[25:48],
+  gdp = gdp_2019
+)
+
+
+ggplot(df, aes(pc1_scores, pc2_scores,label=countries)) +
+  geom_point(aes(colour = gdp)) + geom_text(hjust=0, vjust=0,size=4)
 ```
