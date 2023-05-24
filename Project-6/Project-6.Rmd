@@ -61,9 +61,11 @@ From all European countries, we decided to remove the ones with a population les
 ```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
 data %>% group_by(location) %>% 
   ggplot(aes(x = date,  y = log(total_cases_per_million),color = location)) + 
-  geom_line() + 
+  geom_line() +
+  ggtitle("Cumulative number of cases per million over time (log scale)") + xlab("Date")+ ylab("Cumul. number of cases per million (log)")+
   theme(legend.text = element_text(size=5), legend.key.height= unit(0.2, 'cm'),
-        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7))
+        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7)) +
+  guides(color = guide_legend(ncol = 1))
 ```
 
 ## Data transformation
@@ -98,9 +100,9 @@ As seen above, we check that it matches quite nicely all the first waves of the 
 
 # B-Spline smoothing
 
-In this section, we will use a b-spline basis and fit it to each curve to smooth it and make it the length we want. Before using splines, we first had to remap the starting date to time zero and end date to $1$, with a linear mapping, which projects all the lines on the same domain $[0,1]$.
+In this section, we will use a b-spline basis and fit it to each curve to smooth it and then sample a set of values with the same length. Before using splines, we first had to remap the starting date to time zero and end date to $1$, with a linear mapping, which projects all the lines on the same domain $[0,1]$.
 
-Mathematically, we can describe the B-Spline smoothing following [T. Masak - Functional Data Analysis](https://github.com/TMasak/AppStat/blob/main/Slides/11_functional_data.pdf). For a given country, let $\{y_i\}_{i=1,...,n}$ be noisy values of a function $f$ (which is the covid curve function in our case), evaluated at $\{x_i\}_{i=1,...,n} \in [0,T]$, the days in our case. Furthermore, let $\{\beta_i(x)\}_{i=1,...,q}$ be a set of basis functions chosen such that one can approximate $$y(x) = \sum_{i=1}^q\xi_j \beta_j(x)$$. Then, by defining the optimization problem to find the $\xi$'s, as $$\min_\xi \|y-B\xi\|_2^2, \text{ where } B = (\beta_j(x_n)),$$ we get $\hat{\xi} = (B^TB)^\dagger B^Ty$. Now, for a given set of evaluation points $\{z_i\}_{i=1,...,M}$, one gets $(f(z_1),f(z_2),...,f(z_M))^T = \tilde{B}\hat{\xi}$ where $\tilde{B} = (\beta_j(z_i))$.
+Mathematically, we can describe the B-Spline smoothing following [T. Masak - Functional Data Analysis](https://github.com/TMasak/AppStat/blob/main/Slides/11_functional_data.pdf). For a given country, let $\{y_i\}_{i=1,...,N}$ be noisy values of a function $f$ (which is the covid curve function in our case), evaluated at $\{x_i\}_{i=1,...,N} \in [0,T]$, the days in our case. Furthermore, let $\{\beta_i(x)\}_{i=1,...,q}$ be a set of basis functions chosen such that one can approximate $$y(x) \approx \sum_{i=1}^q\xi_j \beta_j(x).$$ Then, by defining the optimization problem to find the $\xi$'s, as $$\min_\xi \|y-B\xi\|_2^2, \text{ where } B = (\beta_j(x_n)),$$ we get $\hat{\xi} = (B^TB)^\dagger B^Ty$. Now, for a given set of evaluation points $\{z_i\}_{i=1,...,M}$, one gets $(f(z_1),f(z_2),...,f(z_M))^T = \tilde{B}\hat{\xi}$ where $\tilde{B} = (\beta_j(z_i))$.
 
 Practically, we chose b-splines of order six, as we want the speed and acceleration of covid cases to be modeled by b-splines of order three (at least), which are derivatives of the original b-spline. We also set $\{z_i\}_{i=1,...,M}$ as the weekly nodes instead of the original daily nodes as it created too much fluctuations when reaching $t=1$.
 
@@ -209,6 +211,8 @@ df <- data.frame(
   gdp = gdp_2019
 )
 
+df$ names <- countries
+df
 
 ggplot(df, aes(pc1_scores, pc2_scores,label=countries)) +
   geom_point(aes(colour = gdp)) + geom_text(hjust=0, vjust=0,size=4)

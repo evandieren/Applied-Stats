@@ -171,7 +171,7 @@ real_diff <- diff(country_df)/country_df[1:(length(country_df)-1)]
 plot(real_diff,type="l")
 lines(1:length(est_diff),est_diff,type="l",col="red")
 
-#plot(df[df$location=="Austria",]$new_cases_per_million,type="l")
+plot(df[df$location=="Austria",]$new_cases_per_million,type="l")
 #plot(df[df$location=="Austria",]$log_total_cases_per_million,type="l")
 
 plot(1:length(df[df$location == "Austria",]$new_cases_per_million),df[df$location == "Austria",]$new_cases_per_million,type="l")
