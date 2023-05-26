@@ -25,9 +25,9 @@ library(tidyverse)
 
 Since early 2020, COVID-19 has had a profound impact on the entire world. Scientists tried to analyse the various death, cases and hospitalization curves to protect the population via different sanitary measures such as lockdowns, social distancing and mask wearing. Those methods were put in place in order to "flatten the curve", and avoid peaks of population in hospitals. 
 
-In this project, we focus on the first wave in European countries, and more precisely on the curve of covid cases across those countries. From those curves, we try to find main trends and common patterns. Practically, this can be done using Functional Data Analysis (FDA), and more precisely PCA where principal components are functions and each curve will be a linear combination of those functions.
+In this project, we focus on the first wave in European countries, and more precisely on the curve of covid cases across those countries. From those curves, we try to common patterns around the mean. Practically, this can be done using Functional Principal Component Analysis, where principal components are functions and each curve will be a linear combination of those functions plus the mean from the selected countries covid cases..
 
-Regarding the plan of this project, we first start by a description of the dataset and basic transformations. Second, we explore B-Splines smoothing and prepare our data for the PCA computation, which will be the third section of this report. Lastly, we conclude by reporting the take-home messages and next steps. I want to point out that the majority of the reflection on this project has been made with Candice Baud, another Applied Stats student at EPFL. However, the writing of the report and the coding parts are individual work.
+Regarding the plan of this project, we first start by a description of the dataset and basic transformations. Second, we explore B-Splines smoothing and prepare our data for the functional PCA computation, which will be the third section of this report. Lastly, we conclude by reporting the take-home messages and next steps. I want to point out that the majority of the reflection on this project has been made with Candice Baud, another Applied Stats student at EPFL. However, the writing of the report and the coding parts are individual work.
 
 # Data exploration
 
@@ -217,3 +217,5 @@ df
 ggplot(df, aes(pc1_scores, pc2_scores,label=countries)) +
   geom_point(aes(colour = gdp)) + geom_text(hjust=0, vjust=0,size=4)
 ```
+
+# Conclusion
