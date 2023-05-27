@@ -25,7 +25,7 @@ library(tidyverse)
 
 Since early 2020, COVID-19 has had a profound impact on the entire world. Scientists tried to analyse the various death, cases and hospitalization curves to protect the population via different sanitary measures such as lockdowns, social distancing and mask wearing. Those methods were put in place in order to "flatten the curve", and avoid peaks of population in hospitals. 
 
-In this project, we focus on the first wave in European countries, and more precisely on the curve of covid cases across those countries. From those curves, we try to common patterns around the mean. Practically, this can be done using Functional Principal Component Analysis, where principal components are functions and each curve will be a linear combination of those functions plus the mean from the selected countries covid cases..
+In this project, we focus on the first wave in European countries, and more precisely on the curve of covid cases across those countries. From those curves, we try to identify common divergence patterns from the mean. Practically, this can be done using Functional Principal Component Analysis, where principal components are functions and each covid curve will be a linear combination of those functions on top of the mean from the selected countries covid cases.
 
 Regarding the plan of this project, we first start by a description of the dataset and basic transformations. Second, we explore B-Splines smoothing and prepare our data for the functional PCA computation, which will be the third section of this report. Lastly, we conclude by reporting the take-home messages and next steps. I want to point out that the majority of the reflection on this project has been made with Candice Baud, another Applied Stats student at EPFL. However, the writing of the report and the coding parts are individual work.
 
@@ -56,15 +56,15 @@ countries <- countries[!(countries %in% remove_countries)]
 n_countries <- length(countries)
 data <- covid_data %>% dplyr::select(c('date','location','new_cases_per_million','total_cases_per_million')) %>% filter(location %in% countries)
 ```
-From all European countries, we decided to remove the ones with a population less than five million people. This is justified as we are working with cases per million, and therefore each country will further down have the same weight. However, we think that a country like France with more than 65 million people should not be compared with a country like Luxembourg which only has 640 thousands citizens. We further removed Belarus and Russia due to polemical covid cases reports from the authorities. Lastly, we removed all countries which had more than five percent of missing values in `total_cases_per_million`. With all those removals, we went from $51$ countries to $24$. Hereunder is a plot of the logged cumulative number of covid cases for each country.
+From all European countries, we decided to remove the ones with a population less than five million people. This is justified as we are working with cases per million, and therefore each country will further down have the same weight. However, we think that a country like France with more than 65 million people should not be compared with a country like Luxembourg which only has 640 thousands citizens. We further removed Belarus and Russia due to polemical covid cases reports from the authorities. Lastly, we removed all countries which had more than five percent of missing values in `total_cases_per_million`. With all those removals, we went from $51$ countries to $24$. Hereunder is a plot of the log-cumulative number of covid cases for each country.
 
 ```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
 data %>% group_by(location) %>% 
   ggplot(aes(x = date,  y = log(total_cases_per_million),color = location)) + 
   geom_line() +
   ggtitle("Cumulative number of cases per million over time (log scale)") + xlab("Date")+ ylab("Cumul. number of cases per million (log)")+
-  theme(legend.text = element_text(size=5), legend.key.height= unit(0.2, 'cm'),
-        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=7)) +
+  theme(legend.text = element_text(size=10), legend.key.height= unit(0.2, 'cm'),
+        legend.key.width= unit(0.2, 'cm'), legend.title = element_text(size=12)) +
   guides(color = guide_legend(ncol = 1))
 ```
 
@@ -100,11 +100,11 @@ As seen above, we check that it matches quite nicely all the first waves of the 
 
 # B-Spline smoothing
 
-In this section, we will use a b-spline basis and fit it to each curve to smooth it and then sample a set of values with the same length. Before using splines, we first had to remap the starting date to time zero and end date to $1$, with a linear mapping, which projects all the lines on the same domain $[0,1]$.
+In this section, we will use a b-spline basis and fit it to each curve to smooth it and then sample a set of values with the same length. Before using splines, we first had to remap the starting date to time zero and end date to $1$, with a linear mapping, which projects all the lines on the same domain $[0,1]$, but still had different lengths per country.
 
-Mathematically, we can describe the B-Spline smoothing following [T. Masak - Functional Data Analysis](https://github.com/TMasak/AppStat/blob/main/Slides/11_functional_data.pdf). For a given country, let $\{y_i\}_{i=1,...,N}$ be noisy values of a function $f$ (which is the covid curve function in our case), evaluated at $\{x_i\}_{i=1,...,N} \in [0,T]$, the days in our case. Furthermore, let $\{\beta_i(x)\}_{i=1,...,q}$ be a set of basis functions chosen such that one can approximate $$y(x) \approx \sum_{i=1}^q\xi_j \beta_j(x).$$ Then, by defining the optimization problem to find the $\xi$'s, as $$\min_\xi \|y-B\xi\|_2^2, \text{ where } B = (\beta_j(x_n)),$$ we get $\hat{\xi} = (B^TB)^\dagger B^Ty$. Now, for a given set of evaluation points $\{z_i\}_{i=1,...,M}$, one gets $(f(z_1),f(z_2),...,f(z_M))^T = \tilde{B}\hat{\xi}$ where $\tilde{B} = (\beta_j(z_i))$.
+Mathematically, we can describe the B-Spline smoothing following [T. Masak - Functional Data Analysis](https://github.com/TMasak/AppStat/blob/main/Slides/11_functional_data.pdf). For a given country, let $\{y_i\}_{i=1,...,N}$ be noisy values of a function $f$ (which is the covid curve function in our case), evaluated at $\{x_i\}_{i=1,...,N} \in [0,T]$, the days in our case. Furthermore, let $\{\beta_i(x)\}_{i=1,...,q}$ be a set of basis functions chosen such that one can approximate $$y(x) \approx \sum_{i=1}^q\xi_j \beta_j(x).$$ Then, by defining the optimization problem to find the $\xi$'s, as $$\min_\xi \|y-B\xi\|_2^2, \text{ where } B = (\beta_j(x_n)),$$ we get $\hat{\xi} = (B^TB)^\dagger B^Ty$. Now, for a given set of evaluation points $\{z_i\}_{i=1,...,M}$, one gets $(f(z_1),f(z_2),...,f(z_M))^T \approx \tilde{B}\hat{\xi}$ where $\tilde{B} = (\beta_j(z_i))$, which are the smoothed evaluations from our function $f$ at each node.
 
-Practically, we set the order of B-Splines to six, and set $\{z_i\}_{i=1,...,M}$ as the weekly nodes instead of the original daily nodes as it created stability issues for the smoothing when reaching $t=1$.
+Practically, we set the order of B-Splines to six, and set $\{z_i\}_{i=1,...,M}$ as the weekly nodes instead of the original daily nodes as it created stability issues for the smoothing when reaching $t=1$. Herunder are the smoothed functions plot using B-Spline smoothing : 
 
 ```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
 df_matrix <- dplyr::select(df,-c("new_cases_per_million","date")) # new cases not needed anymore
@@ -144,7 +144,7 @@ Mathematically, let a given random sample $\{X_i\}_{i=1,...,N}$ with $X_i \in \m
 * Apply Singular Value Decomposition on $\tilde{X}$ such that $\tilde{X} = UDV^T$.
 * Then, one gets $\hat{e}_j = V_{:,j}$ and $(z_{i,j})_{i,j} = UD$ are the scores.
 
-The first row of the plots below represent the mean of the log-cumulative total cases for $0 \le t \le 1$ (left), and the scores of each country with respect to the first two principal components. The next four plots represent the principal components, and in their title, we compute the percentage of total variance explained.
+The first row of the plots below represent the mean of the log-cumulative total cases for $0 \le t \le 1$ (left), and the scores of each country with respect to the first two principal components (right). The next four plots represent the principal components, and we compute the percentage of total variance explained (see title of figures).
 
 ```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
 z <- seq(1,100)
@@ -195,13 +195,22 @@ perform_pca <- function(X,z){
   # points(z,mu,col=2,lwd=2,type="l")
   # points(z,mu+30*SVD$d[4]/lam*SVD$v[,4],col=2,lwd=2,type="l",lty=2)
   # points(z,mu-30*SVD$d[4]/lam*SVD$v[,4],col=2,lwd=2,type="l",lty=2)
-  return(c(Scores[1,]*sign(sum(Loadings[,1])), Scores[2,]*sign(sum(Loadings[,2]))))
+  return(c(Scores[1,]*sign(sum(Loadings[,1])), Scores[2,]*sign(sum(Loadings[,2])),
+         Scores[3,]*sign(sum(Loadings[,3])),Scores[4,]*sign(sum(Loadings[,4]))))
 }
 out <- perform_pca(df_matrix,z)
 ```
-First, we observe on the top-left plot the red line which represent the mean of log-cumulative number of covid cases for the $24$ retained European countries for $0 \le t \le 1$. We observe a sort of square root increase and a stabilization around $t = 0.5$. Regarding the interpretation of our principal components, the first one shows a growth and stabilization at $t = 0.4$. The second one shows a first bump, following by a steep decrease up to the negative values. The third one also shows a rapid growth, followed by a steep decrease before starting to linearly increase again. The fourth PC shows the same initial bump, followed by an inverse bump and a slight decrease from $t=0.4$.
+First, we observe on the top-left plot the red line which represent the mean of log-cumulative number of covid cases for the $24$ retained European countries for $0 \le t \le 1$. We observe a sort of square root increase and a stabilization around $t = 0.7$. Regarding the interpretation of our principal components, we get:
 
-One notes that we left out the plot of PC scores from the short analysis above. If one gets the GDP of each retained country for $2019$, we can plot those PC scores and apply the GDP as a color to the datapoints on a scatter plot :
+1. The first one starts at $0$ for $t=0$, then shows a growth and stabilization at $t = 0.4$. If the score of a country is positive for this PC, it can be interpreted as a quicker rise of covid cases, followed by a positive stabilization above the mean after $t=0.4$. However if the score is negative, it means that the country had a slower rise of covid cases compared to other countries, and are generally below the mean after $t=0.4$.
+
+2. The second one starts at a non-zero value for $t=0$, shows a first increase up to $t=0.2$, following by a steep decrease until the end, even entering negative values. If a country has a positive coefficient for the second PC, it means that it originally started above the mean (non-zero positive value at $t=0$), then rose even quicker up to $t=0.2$, then reverted to the mean (up to reaching the x-axis), and finally crossing the mean to be below par, as $t$ reaches $1$.
+
+3. The third one also starts at non-zero value, then shows a quicker growth than PC2 up to $t=0.1$. Then, it steeply decreases up to negative values until $t=0.25$, where it starts to linearly increase again. This PC is more complex than the previous ones. If a country has a positive coefficient for the third PC, it means that it originally started above the mean (non-zero positive value at $t=0$), then rose quicker up to $t=0.1$, then steeply reversed and even crossed the mean up to $t=0.25$, before linearly growing, reaching back the mean at $t=0.6$ and continuing rising above the mean up to $t=1$. For negative coefficients, one can simply invert the analysis above to find the behaviour.
+
+4. The fourth PC and last PC analyzed here also shows a complex behaviour, with non-zero start followed by a quick increase before dropping steeply up to $t=0.15$ to negative values. Between $t=0.15$ and $t=0.4$, it increases again to end up slighlty above the mean, before linearly decreasing up to $t=1$.
+
+Regarding the scores of the countries for the first two PCs, one gets the GDP of each retained country for $2019$, we can plot those PC scores and apply the GDP as a color to the datapoints on a scatter plot :
 
 ```{r,fig.align='center', fig.show='hold',fig.dim=c(10,5)}
 gdp_2019 <- c(
@@ -219,7 +228,10 @@ ggplot(df, aes(pc1_scores, pc2_scores,label=countries)) +
   geom_point(aes(colour = gdp)) + geom_text(hjust=0, vjust=0,size=4) + ggtitle("PC Scores with GDP coloring for European countries") + xlab("PC1 scores") + ylab("PC2 scores")
 ```
 
-As seen above, we observe a strong concentration of the PC scores around the $0-0$ point. This means that the majority of the countries are not too far from the mean (as seen on the top-left plot from the previous figure). We observe two outliers from this plot. First, we note that Austria has a significant positive coefficient for the first PC. This means that it will be placed above the mean, as it takes the PC1 is positive and steeply increasing for small $t$. It also has a strongly negative coefficient for the second PC, meaning that its curve will first be below the mean as it will decrease, then start raising after $t=0.2$. The second outlier is Belgium for which both PC scores are negative.
+As seen above, we observe a strong concentration of the PC scores around the $(0,0)$ point. This means that the majority of the countries are not too far from the mean (as seen on the top-left plot from the previous figure). We observe two outliers from this plot : Austria and Belgium, for which we plot the mean hereunder for more clarity. 
+
+1. First, we note that Austria has a significant positive coefficient for the first PC. This means that it will have a first trend which will place it above the mean, as it takes the PC1 is positive ($1.75$) and therefore will have an increasing component up to $t=0.4$, then stabilize positively above the mean up to $t=1$. However, it also has a strongly negative coefficient for the second PC ($-10$), meaning that that the increasing power from PC1 will get mitigated, and especially for $t$ small enough, before increasing above the mean up to the end. From the plot, we do not particularly see this behaviour for small $t$, but when looking at the Austria score for PC3, which is $15$, it explains the first steep increase far better. In fact, Austria is the only country with a high positive value for PC3, which let us think that PC3 was made to explain Austria in some sense.
+2. Regarding Belgium, it has a negative PC1 value, meaning that it should have a slightly slower increase of cases than the mean (which is the case here). It also has a $-2$ coeffiicent for the second PC, which should also indicate a slower start, but a steady increase after $t=0.2$. An intersting finding is that it also has a positive coefficient for PC4 ($2$), which also shows a steady increase after $t=0.3$. All those PC contributions match well what we observe in this plot.
 
 ```{r}
 aus_bel <- c(1,2)
@@ -231,4 +243,15 @@ points(z,mu,col=2,lwd=2,type="l")
 legend('bottomright',legend=c("European mean","Austria","Belgium"),col=c(2,aus_bel+2),fill = c(2,aus_bel+2),cex = 0.75)
 ```
 
+```{r}
+# df_2 <- data.frame(
+#   pc3_scores = out[49:72],
+#   pc4_scores = out[73:96],
+#   gdp = gdp_2019
+# )
+# ggplot(df_2, aes(pc3_scores, pc4_scores,label=countries)) +
+#   geom_point(aes(colour = gdp)) + geom_text(hjust=0, vjust=0,size=4) + ggtitle("PC Scores with GDP coloring for European countries") + xlab("PC3 scores") + ylab("PC4 scores")
+```
 # Conclusion
+
+In conclusion, we used Functional Principal Component Analysis to understand a bit better how the first wave of covid hit Europe in early $2020$. We used the B-Spline smoothing method to enable us comparing all covid curves which initially had different lengths and apply PCA on it. We observed several intersting principal components which explain deviation behaviours from the mean, as well as two outliers which we dig up on. The next steps for this project would be to analyse the covid spreading speed, as well as acceleration over European countries, and then compare it to other continents.
